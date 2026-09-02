@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Camera, Check, Image as ImageIcon, Sparkles, Zap } from 'lucide-react';
 
 type Phase = 'idle' | 'scanning' | 'detected' | 'confirmed';
@@ -16,6 +16,33 @@ const DETECTED = { name: 'ขวดพลาสติกใส PET', points: 10,
  */
 export function WasteScanner() {
   const [phase, setPhase] = useState<Phase>('idle');
+
+  /**
+   * The fake analysis delay has to be cancellable.
+   *
+   * Without this, leaving the page mid-scan lands a setPhase on an unmounted
+   * component, and tapping the shutter twice starts a second timer that fires
+   * after the first has already moved the UI on — so a confirmed result flips
+   * back to "detected" a moment later.
+   */
+  const timer = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (timer.current !== null) window.clearTimeout(timer.current);
+    };
+  }, []);
+
+  function startScan() {
+    if (phase === 'scanning') return;
+    if (timer.current !== null) window.clearTimeout(timer.current);
+
+    setPhase('scanning');
+    timer.current = window.setTimeout(() => {
+      timer.current = null;
+      setPhase('detected');
+    }, 900);
+  }
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
@@ -81,12 +108,11 @@ export function WasteScanner() {
             </button>
 
             <button
-              onClick={() => {
-                setPhase('scanning');
-                window.setTimeout(() => setPhase('detected'), 900);
-              }}
+              onClick={startScan}
+              disabled={phase === 'scanning'}
               aria-label="สแกน"
-              className="grid h-16 w-16 place-items-center rounded-full bg-white text-emerald-700 shadow-lg transition active:scale-95"
+              aria-busy={phase === 'scanning'}
+              className="grid h-16 w-16 place-items-center rounded-full bg-white text-emerald-700 shadow-lg transition active:scale-95 disabled:opacity-70 disabled:active:scale-100"
             >
               <Camera className="h-7 w-7" />
             </button>

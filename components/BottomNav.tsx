@@ -58,7 +58,7 @@ export function BottomNav() {
   const pathname = usePathname();
 
   const isActive = (href: string) =>
-    href === '/' ? pathname === '/' : pathname.startsWith(href);
+    href === '/' ? pathname === '/' : (pathname ?? '').startsWith(href);
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-md md:hidden">

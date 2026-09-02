@@ -18,7 +18,7 @@ export function MobileNav() {
   const right = MOBILE_NAV_ITEMS.slice(2);
 
   const isActive = (href: string) =>
-    href === '/dashboard' ? pathname === href : pathname.startsWith(href);
+    href === '/dashboard' ? pathname === href : (pathname ?? '').startsWith(href);
 
   const Tab = ({ href, label, icon: Icon }: (typeof MOBILE_NAV_ITEMS)[number]) => {
     const active = isActive(href);

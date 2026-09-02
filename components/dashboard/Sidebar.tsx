@@ -21,7 +21,9 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
         // `/dashboard` must not light up on every child route, so the root gets
         // an exact match and everything below it a prefix match.
         const active =
-          href === '/dashboard' ? pathname === href : pathname.startsWith(href);
+          href === '/dashboard'
+            ? pathname === href
+            : (pathname ?? '').startsWith(href);
 
         return (
           <Link

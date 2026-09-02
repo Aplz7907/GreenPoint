@@ -33,7 +33,10 @@ export function groupByCampus(faculties: Faculty[]) {
   const groups = new Map<string, Faculty[]>();
 
   for (const f of faculties) {
-    const key = f.campus_th ?? 'อื่น ๆ';
+    // Rows with no campus are the ones from a database that has not replayed
+    // schema.sql yet. They keep their place in the list but are rendered loose,
+    // above the groups — "มทร.อีสาน อื่น ๆ" would name a campus that does not exist.
+    const key = f.campus_th ?? '';
     const bucket = groups.get(key);
     if (bucket) bucket.push(f);
     else groups.set(key, [f]);

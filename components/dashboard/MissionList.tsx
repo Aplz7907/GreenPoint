@@ -11,8 +11,13 @@ const BADGE_TONE: Record<Mission['badge'], string> = {
 };
 
 function MissionCard({ title, detail, current, goal, reward, badge }: Mission) {
-  const pct = Math.round((current / goal) * 100);
-  const done = current >= goal;
+  // A goal of 0 divides to Infinity and a goal already overshot gives >100,
+  // and both reach CSS as a width — `width: NaN%` is dropped by the browser and
+  // `width: 140%` runs the fill out of its own rounded track. Clamp once here so
+  // neither the bar nor the label can render a value that does not exist.
+  const pct =
+    goal > 0 ? Math.min(100, Math.max(0, Math.round((current / goal) * 100))) : 0;
+  const done = goal > 0 && current >= goal;
 
   return (
     <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">

@@ -92,6 +92,15 @@ export function PointsHistoryTable() {
         </button>
       </div>
 
+      {/* An empty result renders the message ALONE. Leaving the table mounted
+          would show a header row over nothing, which reads as a page that
+          failed to load rather than as a filter with no matches. */}
+      {rows.length === 0 ? (
+        <p className="p-10 text-center text-sm text-slate-500">
+          ยังไม่มีรายการในช่วงนี้
+        </p>
+      ) : (
+        <>
       {/* Desktop and tablet */}
       <div className="hidden md:block">
         <table className="w-full text-left">
@@ -142,10 +151,7 @@ export function PointsHistoryTable() {
         ))}
       </ul>
 
-      {rows.length === 0 && (
-        <p className="p-10 text-center text-sm text-slate-500">
-          ยังไม่มีรายการในช่วงนี้
-        </p>
+        </>
       )}
     </section>
   );

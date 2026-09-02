@@ -34,10 +34,18 @@ export function FacultySettings({
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  /**
+   * Returns whether the write landed.
+   *
+   * Both controls update themselves before the round-trip so they feel
+   * instant, which means a failed write leaves the UI asserting something the
+   * database does not hold — the select showing a faculty the user is not in.
+   * The callers use this to put their own state back.
+   */
   async function save(next: {
     faculty_id?: number | null;
     show_on_leaderboard?: boolean;
-  }) {
+  }): Promise<boolean> {
     setError(null);
     setSaved(false);
 
@@ -48,7 +56,7 @@ export function FacultySettings({
 
     if (!user) {
       setError('เซสชันหมดอายุ ลองรีเฟรชหน้านี้แล้วเข้าสู่ระบบใหม่นะ');
-      return;
+      return false;
     }
 
     const { error: updateError } = await supabase
@@ -58,13 +66,14 @@ export function FacultySettings({
 
     if (updateError) {
       setError('บันทึกไม่สำเร็จ ลองใหม่อีกครั้งนะ');
-      return;
+      return false;
     }
 
     setSaved(true);
     // The boards are rendered on the server, so they only reflect the new
     // faculty after a refetch.
     startTransition(() => router.refresh());
+    return true;
   }
 
   return (
@@ -83,12 +92,17 @@ export function FacultySettings({
             disabled={isPending}
             onChange={(raw) => {
               const next = raw === '' ? null : Number(raw);
+              const previous = facultyId;
               setFacultyId(next);
-              void save({ faculty_id: next });
+              void save({ faculty_id: next }).then((ok) => {
+                if (!ok) setFacultyId(previous);
+              });
             }}
           />
           <p className="field-hint">
-            แต้มของคุณจะถูกนับรวมเข้ากระดานคณะโดยไม่เปิดเผยชื่อ
+            {faculties.length === 0
+              ? 'ยังโหลดรายชื่อคณะไม่ได้ ลองรีเฟรชหน้านี้อีกครั้งนะ'
+              : 'แต้มของคุณจะถูกนับรวมเข้ากระดานคณะโดยไม่เปิดเผยชื่อ'}
           </p>
         </div>
 
@@ -108,7 +122,9 @@ export function FacultySettings({
               onClick={() => {
                 const next = !visible;
                 setVisible(next);
-                void save({ show_on_leaderboard: next });
+                void save({ show_on_leaderboard: next }).then((ok) => {
+                  if (!ok) setVisible(!next);
+                });
               }}
               aria-checked={visible}
               aria-label="แสดงชื่อบนกระดานรายบุคคล"

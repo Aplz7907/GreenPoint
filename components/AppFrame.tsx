@@ -25,8 +25,12 @@ const CHROMELESS = [
 export function AppFrame({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
+  // usePathname() is typed as a string but returns null while the router is
+  // still resolving in some rendering paths. Calling .startsWith() on that
+  // throws inside a root-level component, which blanks the entire app rather
+  // than one route — so the chrome is simply shown until a path is known.
   const chromeless = CHROMELESS.some(
-    (p) => pathname === p || pathname.startsWith(`${p}/`)
+    (p) => pathname === p || (pathname ?? '').startsWith(`${p}/`)
   );
 
   if (chromeless) return <>{children}</>;

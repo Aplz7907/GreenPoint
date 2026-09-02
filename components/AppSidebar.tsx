@@ -61,8 +61,9 @@ const SECTIONS: {
 export function AppSidebar() {
   const pathname = usePathname();
 
+  // Null-safe: a null pathname simply lights nothing up, rather than throwing.
   const isActive = (href: string) =>
-    href === '/' ? pathname === '/' : pathname.startsWith(href);
+    href === '/' ? pathname === '/' : (pathname ?? '').startsWith(href);
 
   return (
     <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col overflow-y-auto border-r border-line bg-surface md:flex">
