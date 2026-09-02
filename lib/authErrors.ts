@@ -49,6 +49,8 @@ export function callbackErrorTh(code: string | null): string | null {
       return 'ลิงก์ไม่สมบูรณ์ กรุณาลองเข้าสู่ระบบอีกครั้ง';
     case 'exchange_failed':
       return 'ลิงก์หมดอายุหรือถูกใช้ไปแล้ว กรุณาลองใหม่อีกครั้ง';
+    case 'backend_unreachable':
+      return 'ตอนนี้เชื่อมต่อระบบไม่ได้ ทำให้ยังเข้าสู่ระบบไม่ได้ กรุณาลองใหม่อีกสักครู่';
     default:
       return 'เข้าสู่ระบบไม่สำเร็จ ลองใหม่อีกครั้งนะ';
   }

@@ -1,4 +1,4 @@
-# ♻️ EcoPoints
+# ♻️ Green Point
 
 เว็บแอปเก็บแต้มจากการแยกขยะ — ผู้ใช้ถ่ายรูปขยะรีไซเคิลที่แยกแล้ว AI ตรวจสอบรูป แล้วให้แต้มไปแลกของรางวัล
 
@@ -90,8 +90,8 @@ cp .env.example .env.local
 ### 6. รัน
 
 ```bash
-npm install
-npm run dev
+bun install
+bun dev
 ```
 
 เปิด http://localhost:3000 → สมัครสมาชิก → ถ่ายรูปขยะรีไซเคิลจริงส่งดู

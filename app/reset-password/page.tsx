@@ -3,11 +3,16 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Check, Hourglass } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { authErrorTh } from '@/lib/authErrors';
-import { AuthError, FieldLabel, PasswordInput, Spinner } from '@/components/AuthUI';
+import {
+  AuthError,
+  FieldLabel,
+  PasswordInput,
+  Spinner,
+} from '@/components/AuthUI';
 import { AuthShell } from '@/components/AuthShell';
+import { AlertIcon, CheckIcon } from '@/components/Icons';
 
 const MIN_PASSWORD_LENGTH = 8;
 
@@ -63,19 +68,18 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <AuthShell title="ตั้งรหัสผ่านใหม่" band="green">
+    <AuthShell title="ตั้งรหัสผ่านใหม่">
       {checking ? (
-        <div className="card flex items-center justify-center gap-3 py-12 font-bold uppercase tracking-widest text-bau-ink/50">
+        <div className="card flex items-center justify-center gap-2 py-10 text-sm text-ink-subtle">
           <Spinner /> กำลังตรวจสอบลิงก์
         </div>
       ) : done ? (
-        <div className="card text-center">
-          <span aria-hidden className="card-mark rounded-full bg-bau-green" />
-          <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full border-4 border-bau-ink bg-bau-green text-white shadow-hard">
-            <Check className="h-10 w-10" strokeWidth={4} aria-hidden />
-          </div>
-          <h2 className="text-2xl font-black">เปลี่ยนรหัสผ่านเรียบร้อย</h2>
-          <p className="mt-3 font-medium text-bau-ink/60">
+        <div className="card animate-fade-up text-center">
+          <span className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-full bg-primary-soft text-primary-ink">
+            <CheckIcon className="h-6 w-6" />
+          </span>
+          <h2 className="mt-3 font-semibold">เปลี่ยนรหัสผ่านเรียบร้อย</h2>
+          <p className="mt-2 text-sm text-ink-subtle">
             ครั้งหน้าเข้าสู่ระบบด้วยรหัสผ่านใหม่ได้เลย
           </p>
           <button
@@ -84,30 +88,27 @@ export default function ResetPasswordPage() {
               router.replace('/');
               router.refresh();
             }}
-            className="btn-primary mt-6 w-full"
+            className="btn-primary mt-4 w-full"
           >
             เริ่มเก็บแต้มเลย
           </button>
         </div>
       ) : !hasSession ? (
         <div className="card text-center">
-          <span aria-hidden className="card-mark rounded-none bg-bau-red" />
-          <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-none border-4 border-bau-ink bg-bau-red text-white shadow-hard">
-            <Hourglass className="h-10 w-10" strokeWidth={2.5} aria-hidden />
-          </div>
-          <h2 className="text-2xl font-black">ลิงก์หมดอายุแล้ว</h2>
-          <p className="mt-3 font-medium leading-relaxed text-bau-ink/60">
+          <span className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-full bg-warn-soft text-warn-ink">
+            <AlertIcon className="h-6 w-6" />
+          </span>
+          <h2 className="mt-3 font-semibold">ลิงก์หมดอายุแล้ว</h2>
+          <p className="mt-2 text-sm text-ink-subtle">
             ลิงก์ตั้งรหัสผ่านใช้ได้ครั้งเดียวและมีอายุจำกัด ขอลิงก์ใหม่อีกครั้งนะ
           </p>
-          <Link href="/forgot-password" className="btn-primary mt-6 w-full">
+          <Link href="/forgot-password" className="btn-primary mt-4 w-full">
             ขอลิงก์ใหม่
           </Link>
         </div>
       ) : (
         <div className="card">
-          <span aria-hidden className="card-mark rounded-full bg-bau-green" />
-
-          <form onSubmit={updatePassword} className="space-y-5">
+          <form onSubmit={updatePassword} className="space-y-4">
             <div>
               <FieldLabel htmlFor="password">รหัสผ่านใหม่</FieldLabel>
               <PasswordInput

@@ -113,7 +113,9 @@ export async function getProfile() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id, display_name, points_balance, is_banned, created_at')
+    .select(
+      'id, display_name, points_balance, is_banned, created_at, faculty_id, show_on_leaderboard'
+    )
     .eq('id', user.id)
     .single();
 

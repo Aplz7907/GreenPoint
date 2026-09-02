@@ -3,21 +3,29 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Mail } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { authErrorTh } from '@/lib/authErrors';
-import { AuthError, FieldLabel, PasswordInput, Spinner } from '@/components/AuthUI';
+import {
+  AuthError,
+  FieldLabel,
+  PasswordInput,
+  Spinner,
+} from '@/components/AuthUI';
+import { CheckIcon } from '@/components/Icons';
+import type { Faculty } from '@/lib/types';
+import { FacultySelect } from '@/components/FacultySelect';
 
 const MIN_PASSWORD_LENGTH = 8;
 
 type Busy = null | 'signup';
 
-export function RegisterForm() {
+export function RegisterForm({ faculties = [] }: { faculties?: Faculty[] }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const next = searchParams.get('next') || '/';
 
   const [displayName, setDisplayName] = useState('');
+  const [facultyId, setFacultyId] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -53,9 +61,14 @@ export function RegisterForm() {
       password,
       options: {
         emailRedirectTo: callbackUrl(),
-        // The on_auth_user_created trigger in schema.sql reads full_name out of
-        // raw_user_meta_data to seed profiles.display_name.
-        data: { full_name: displayName.trim() || null },
+        // The on_auth_user_created trigger in schema.sql reads these out of
+        // raw_user_meta_data to seed the profile row. It validates faculty_id
+        // against the faculties table, so a junk value here costs the user
+        // their faculty and nothing else.
+        data: {
+          full_name: displayName.trim() || null,
+          faculty_id: facultyId || null,
+        },
       },
     });
 
@@ -88,22 +101,17 @@ export function RegisterForm() {
 
   if (confirmSent) {
     return (
-      <div className="card text-center">
-        <span aria-hidden className="card-mark rounded-full bg-bau-green" />
-        <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-none border-4 border-bau-ink bg-bau-green text-white shadow-hard">
-          <Mail className="h-10 w-10" strokeWidth={2.5} aria-hidden />
-        </div>
-        <h2 className="text-2xl font-black">อีกขั้นเดียว</h2>
-        <p className="mt-3 font-medium leading-relaxed text-bau-ink/60">
-          เราส่งลิงก์ยืนยันไปที่
-        </p>
-        <p className="mt-2 break-all border-2 border-bau-ink bg-bau-yellow px-3 py-2 font-bold">
-          {email}
-        </p>
-        <p className="mt-3 text-sm font-medium text-bau-ink/50">
+      <div className="card animate-fade-up text-center">
+        <span className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-full bg-primary-soft text-primary-ink">
+          <CheckIcon className="h-6 w-6" />
+        </span>
+        <h2 className="mt-3 font-semibold">อีกขั้นเดียว</h2>
+        <p className="mt-2 text-sm text-ink-subtle">เราส่งลิงก์ยืนยันไปที่</p>
+        <p className="mt-1 break-all text-sm font-medium">{email}</p>
+        <p className="mt-2 text-sm text-ink-subtle">
           เปิดอีเมลแล้วกดลิงก์เพื่อยืนยันบัญชี (ถ้าไม่เจอ ลองดูในกล่องสแปม)
         </p>
-        <Link href="/login" className="btn-outline mt-6 w-full">
+        <Link href="/login" className="btn-outline mt-4 w-full">
           ไปหน้าเข้าสู่ระบบ
         </Link>
       </div>
@@ -116,9 +124,7 @@ export function RegisterForm() {
 
   return (
     <div className="card">
-      <span aria-hidden className="card-mark rounded-none bg-bau-blue" />
-
-      <form onSubmit={signUp} className="space-y-5">
+      <form onSubmit={signUp} className="space-y-4">
         <div>
           <FieldLabel htmlFor="displayName">ชื่อที่อยากให้เรียก</FieldLabel>
           <input
@@ -132,6 +138,21 @@ export function RegisterForm() {
             className="input"
           />
         </div>
+
+        {faculties.length > 0 && (
+          <div>
+            <FieldLabel htmlFor="faculty">คณะ (ไม่บังคับ)</FieldLabel>
+            <FacultySelect
+              id="faculty"
+              faculties={faculties}
+              value={facultyId}
+              onChange={setFacultyId}
+            />
+            <p className="field-hint">
+              แต้มของคุณจะไปช่วยคณะแข่งกับคณะอื่น เปลี่ยนทีหลังได้
+            </p>
+          </div>
+        )}
 
         <div>
           <FieldLabel htmlFor="email">อีเมล</FieldLabel>
@@ -160,7 +181,7 @@ export function RegisterForm() {
             onToggleVisible={() => setShowPassword((v) => !v)}
           />
           {passwordTooShort && (
-            <p className="mt-2 border-2 border-bau-ink bg-bau-yellow px-3 py-1.5 text-xs font-bold">
+            <p className="mt-1.5 text-sm text-warn-ink">
               สั้นไปนิด — ต้องอย่างน้อย {MIN_PASSWORD_LENGTH} ตัวอักษร
             </p>
           )}
@@ -178,7 +199,7 @@ export function RegisterForm() {
             onToggleVisible={() => setShowPassword((v) => !v)}
           />
           {mismatch && (
-            <p className="mt-2 border-2 border-bau-ink bg-bau-yellow px-3 py-1.5 text-xs font-bold">
+            <p className="mt-1.5 text-sm text-warn-ink">
               ยังไม่ตรงกับรหัสผ่านด้านบน
             </p>
           )}
@@ -206,11 +227,11 @@ export function RegisterForm() {
 
       {error && <AuthError message={error} />}
 
-      <p className="mt-6 border-t-2 border-bau-ink pt-5 text-center text-sm font-medium text-bau-ink/60">
+      <p className="mt-5 border-t border-line pt-4 text-center text-sm text-ink-subtle">
         มีบัญชีอยู่แล้ว?{' '}
         <Link
           href={`/login?next=${encodeURIComponent(next)}`}
-          className="font-black text-bau-green underline decoration-2 underline-offset-4"
+          className="font-semibold text-primary-ink hover:underline"
         >
           เข้าสู่ระบบ
         </Link>

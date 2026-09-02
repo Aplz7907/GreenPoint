@@ -4,10 +4,12 @@ import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { analyzeWasteImage } from '@/lib/gemini';
 import {
   checkRateLimit,
+  getScoringContext,
   hashImage,
   isDuplicateImage,
   isSimilarImage,
 } from '@/lib/guards';
+import { computeAward, formatWeightTh, MAX_BASE_POINTS } from '@/lib/scoring';
 import { computeDHash } from '@/lib/phash';
 import type {
   AiVisionResult,
@@ -30,12 +32,6 @@ const ALLOWED_MIME = [
 
 /** Below this, we do not trust the AI enough to pay for the item at all. */
 const MIN_CONFIDENCE = 0.6;
-/**
- * Hard ceiling per photo. There is no human review in this system, so instead
- * of escalating a suspiciously large haul to a person, we simply refuse to pay
- * more than this for one picture.
- */
-const MAX_POINTS_PER_SUBMISSION = 100;
 
 function fail(message: string, status: number, extra: Partial<SubmitResponse> = {}) {
   return NextResponse.json<SubmitResponse>(
@@ -184,7 +180,7 @@ export async function POST(request: Request) {
   // ---------------------------------------------------------------------
   const { data: wasteTypes, error: wasteError } = await admin
     .from('waste_types')
-    .select('code, name_th, points_per_item, is_active')
+    .select('code, name_th, points_per_item, gram_per_item, is_active')
     .eq('is_active', true);
 
   if (wasteError || !wasteTypes) {
@@ -200,6 +196,10 @@ export async function POST(request: Request) {
   //   - ones whose code is not in the active price list (we cannot pay for what
   //     we cannot price)
   let rawPoints = 0;
+  // Weight follows the points: an item we would not pay for is an item we do
+  // not claim was recycled either, so the impact figure can never overstate
+  // what the AI actually saw.
+  let gramsTotal = 0;
 
   const itemBreakdown: SubmitResponse['items'] = visionResult.items.map((item) => {
     const wasteType = priceList.get(item.type);
@@ -207,6 +207,9 @@ export async function POST(request: Request) {
     const points = wasteType && confident ? item.count * wasteType.points_per_item : 0;
 
     rawPoints += points;
+    if (wasteType && confident) {
+      gramsTotal += item.count * (wasteType.gram_per_item ?? 0);
+    }
 
     return {
       ...item,
@@ -215,8 +218,8 @@ export async function POST(request: Request) {
     };
   });
 
-  const calculatedPoints = Math.min(rawPoints, MAX_POINTS_PER_SUBMISSION);
-  const wasCapped = rawPoints > MAX_POINTS_PER_SUBMISSION;
+  const calculatedPoints = Math.min(rawPoints, MAX_BASE_POINTS);
+  const wasCapped = rawPoints > MAX_BASE_POINTS;
 
   let status: SubmissionStatus;
   let rejectReason: string | null = null;
@@ -238,7 +241,31 @@ export async function POST(request: Request) {
     status = 'approved';
   }
 
-  const pointsEarned = status === 'approved' ? calculatedPoints : 0;
+  // ---------------------------------------------------------------------
+  // 8b. Streak / tier / event multipliers.
+  //
+  //     Only for an approved photo: a rejected one earns nothing, and reading
+  //     the context would be a wasted round trip on the unhappy path. The
+  //     numbers still come from the server alone — the client has no say in
+  //     what streak it is on any more than it does in what a can is worth.
+  // ---------------------------------------------------------------------
+  const scoring =
+    status === 'approved'
+      ? await getScoringContext(admin, user.id)
+      : null;
+
+  const award =
+    scoring && status === 'approved'
+      ? computeAward({
+          basePoints: calculatedPoints,
+          lifetimePoints: scoring.lifetimePoints,
+          streakDays: scoring.streakDays,
+          eventMultiplier: scoring.eventMultiplier,
+          eventName: scoring.eventName,
+        })
+      : null;
+
+  const pointsEarned = award?.finalPoints ?? 0;
 
   // ---------------------------------------------------------------------
   // 9. Upload the image to the private bucket.
@@ -271,8 +298,17 @@ export async function POST(request: Request) {
       calculated_points: calculatedPoints,
       raw_points: rawPoints,
       capped: wasCapped,
+      // The multiplier breakdown, kept verbatim so "why did I get 46?" can be
+      // answered from the row itself months later, without re-running scoring
+      // against price lists and bonus periods that have since changed.
+      bonuses: award?.bonuses ?? [],
+      streak_days: scoring?.streakDays ?? null,
+      award_capped: award?.capped ?? false,
     },
     points_earned: pointsEarned,
+    base_points: status === 'approved' ? calculatedPoints : 0,
+    multiplier: award?.multiplier ?? 1,
+    grams_total: status === 'approved' ? gramsTotal : 0,
     status,
     reject_reason: rejectReason,
   });
@@ -302,12 +338,30 @@ export async function POST(request: Request) {
   // ---------------------------------------------------------------------
   // 11. Answer in Thai.
   // ---------------------------------------------------------------------
-  const message =
-    status === 'approved'
-      ? wasCapped
-        ? `เยี่ยมมาก! ได้ ${pointsEarned} แต้ม 🎉 (สูงสุด ${MAX_POINTS_PER_SUBMISSION} แต้มต่อครั้ง — ครั้งหน้าแบ่งถ่ายหลายรูปได้แต้มเต็มกว่านะ)`
-        : `เยี่ยมมาก! ได้ ${pointsEarned} แต้ม 🎉`
-      : (rejectReason ?? 'รูปนี้ไม่ผ่านการตรวจสอบ');
+  let message: string;
+
+  if (status !== 'approved') {
+    message = rejectReason ?? 'รูปนี้ไม่ผ่านการตรวจสอบ';
+  } else {
+    message = `เยี่ยมมาก! ได้ ${pointsEarned} แต้ม 🎉`;
+
+    // Say the bonus out loud. A multiplier the user cannot see is a multiplier
+    // that changes no behaviour, and the whole point of a streak is that it is
+    // felt on the day it pays out.
+    if (award && award.bonusPoints > 0) {
+      message += ` (${calculatedPoints} × ${award.multiplier} — ${award.bonuses
+        .map((b) => b.label_th)
+        .join(' + ')})`;
+    }
+
+    if (wasCapped) {
+      message += ` · สูงสุด ${MAX_BASE_POINTS} แต้มต่อรูป ครั้งหน้าแบ่งถ่ายหลายรูปได้แต้มเต็มกว่านะ`;
+    }
+
+    if (gramsTotal > 0) {
+      message += ` · รีไซเคิลไป ${formatWeightTh(gramsTotal)}`;
+    }
+  }
 
   return NextResponse.json<SubmitResponse>({
     ok: true,
@@ -317,5 +371,10 @@ export async function POST(request: Request) {
     items: itemBreakdown,
     message,
     reject_reason: rejectReason ?? undefined,
+    base_points: status === 'approved' ? calculatedPoints : undefined,
+    multiplier: award?.multiplier,
+    bonuses: award?.bonuses,
+    grams: status === 'approved' ? gramsTotal : undefined,
+    streak_days: scoring?.streakDays,
   });
 }

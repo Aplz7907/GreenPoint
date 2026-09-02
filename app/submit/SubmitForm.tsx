@@ -3,13 +3,39 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Camera, Check, X } from 'lucide-react';
-import { Spinner } from '@/components/AuthUI';
-import { CardMark, ShapeField } from '@/components/Geometry';
+import {
+  AlertIcon,
+  CheckIcon,
+  LeafIcon,
+  ScanIcon,
+  SparkIcon,
+} from '@/components/Icons';
 import { WASTE_LABELS, formatPoints } from '@/lib/copy';
 import type { SubmitResponse } from '@/lib/types';
 
 type Phase = 'pick' | 'preview' | 'uploading' | 'result';
+
+/**
+ * The four corner brackets from the prototype's scan screen.
+ *
+ * Purely decorative — there is no live viewfinder here, the photo is already
+ * taken — but it is what makes the screen read as "scanning" rather than as a
+ * file upload, and it frames the subject the way the capture guidance asks the
+ * user to frame it.
+ */
+function ScanFrame() {
+  const corner =
+    'absolute h-8 w-8 border-mint transition-opacity duration-300';
+
+  return (
+    <span className="pointer-events-none absolute inset-6" aria-hidden>
+      <span className={`${corner} left-0 top-0 rounded-tl-lg border-l-2 border-t-2`} />
+      <span className={`${corner} right-0 top-0 rounded-tr-lg border-r-2 border-t-2`} />
+      <span className={`${corner} bottom-0 left-0 rounded-bl-lg border-b-2 border-l-2`} />
+      <span className={`${corner} bottom-0 right-0 rounded-br-lg border-b-2 border-r-2`} />
+    </span>
+  );
+}
 
 /** Reassuring, rotating copy — the Gemini call takes a few seconds. */
 const WAITING_MESSAGES = [
@@ -18,6 +44,58 @@ const WAITING_MESSAGES = [
   'กำลังคิดแต้มให้',
   'ใกล้เสร็จแล้ว รออีกนิด',
 ];
+
+/** Long edge, in pixels, of what we actually upload. */
+const MAX_EDGE = 1280;
+
+/**
+ * Shrink the photo in the browser before it goes anywhere.
+ *
+ * A modern phone camera hands us 3–6 MB. Nothing downstream wants that: the
+ * upload is the slowest part of the whole flow on mobile data, and the AI reads
+ * a 1280px frame exactly as well as a 4000px one. This typically turns a 4 MB
+ * POST into ~200 KB.
+ *
+ * Any failure (an exotic HEIC, a browser without createImageBitmap) falls back
+ * to sending the original file — a slow submission beats a broken one.
+ */
+async function shrink(file: File): Promise<File> {
+  if (typeof createImageBitmap !== 'function') return file;
+
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, MAX_EDGE / Math.max(bitmap.width, bitmap.height));
+
+    // Already small enough — re-encoding would only lose quality for nothing.
+    if (scale === 1 && file.size < 600_000) {
+      bitmap.close();
+      return file;
+    }
+
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      bitmap.close();
+      return file;
+    }
+
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close();
+
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, 'image/jpeg', 0.82)
+    );
+
+    if (!blob || blob.size >= file.size) return file;
+
+    return new File([blob], 'photo.jpg', { type: 'image/jpeg' });
+  } catch {
+    return file;
+  }
+}
 
 export function SubmitForm() {
   const router = useRouter();
@@ -84,7 +162,7 @@ export function SubmitForm() {
     // The body carries the image and NOTHING else. No point value, no waste
     // type, no count — the server decides all of that.
     const body = new FormData();
-    body.append('image', file);
+    body.append('image', await shrink(file));
 
     let data: SubmitResponse;
 
@@ -115,76 +193,79 @@ export function SubmitForm() {
     const approved = result.status === 'approved';
 
     return (
-      <div className="space-y-5">
-        {/* The verdict is a colour block, not a toast. Green = paid, red = no. */}
-        <section
-          className={`relative overflow-hidden border-2 border-bau-ink p-6 text-center shadow-hard-lg sm:border-4 ${
-            approved ? 'bg-bau-green text-white' : 'bg-bau-red text-white'
-          }`}
-        >
-          <ShapeField variant={approved ? 'green' : 'blue'} />
+      <div className="space-y-4">
+        {/* The payoff moment. Approved gets the full green treatment — this is
+            the one screen in the app allowed to celebrate. */}
+        {approved ? (
+          <section className="animate-pop relative overflow-hidden rounded-card bg-gradient-to-br from-hero-from to-hero-to p-6 text-center text-hero-ink shadow-lift">
+            <div
+              className="leaf-field-hero pointer-events-none absolute inset-0"
+              aria-hidden
+            />
+            <LeafIcon
+              className="pointer-events-none absolute -bottom-8 -left-6 h-36 w-36 -rotate-12 text-hero-ink/10"
+            />
 
-          <div className="relative">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border-4 border-bau-ink bg-white">
-              {approved ? (
-                <Check className="h-9 w-9 text-bau-green" strokeWidth={4} aria-hidden />
-              ) : (
-                <X className="h-9 w-9 text-bau-red" strokeWidth={4} aria-hidden />
+            <div className="relative">
+              <span className="mx-auto inline-flex h-11 w-11 items-center justify-center rounded-full bg-hero-ink/15 ring-1 ring-inset ring-hero-ink/25">
+                <CheckIcon className="h-6 w-6" />
+              </span>
+
+              <p className="mt-3 text-sm text-hero-muted">ได้รับ</p>
+              <p className="font-display text-5xl font-bold tracking-tight nums">
+                +{formatPoints(result.points_earned ?? 0)}
+              </p>
+
+              {result.points_balance !== undefined && (
+                <p className="mt-1.5 text-sm text-hero-muted">
+                  แต้มรวม {formatPoints(result.points_balance)}
+                </p>
               )}
+
+              <p className="mt-4 text-sm text-hero-muted">{result.message}</p>
             </div>
-
-            {approved && (
-              <>
-                <p className="text-xs font-bold uppercase tracking-[0.2em] text-white/70">
-                  ได้รับ
-                </p>
-                <p className="text-7xl font-black leading-[0.85] tracking-tighter">
-                  +{formatPoints(result.points_earned ?? 0)}
-                </p>
-                {result.points_balance !== undefined && (
-                  <p className="mt-4 inline-block border-2 border-bau-ink bg-bau-yellow px-3 py-1 text-sm font-bold text-bau-ink">
-                    แต้มรวม {formatPoints(result.points_balance)}
-                  </p>
-                )}
-              </>
-            )}
-
-            <p
-              className={`font-bold leading-relaxed ${
-                approved ? 'mt-4 text-sm text-white/90' : 'text-lg'
-              }`}
-            >
-              {result.message}
+          </section>
+        ) : (
+          <section className="animate-pop rounded-card border border-danger-line bg-danger-soft p-6 text-center">
+            <span className="mx-auto inline-flex h-11 w-11 items-center justify-center rounded-full bg-danger/10 text-danger-ink">
+              <AlertIcon className="h-6 w-6" />
+            </span>
+            <p className="mt-3 font-semibold text-danger-ink">
+              ไม่ผ่านการตรวจสอบ
             </p>
-          </div>
-        </section>
+            <p className="mt-2 text-sm text-danger-ink/90">{result.message}</p>
+          </section>
+        )}
 
         {result.items && result.items.length > 0 && (
-          <div className="card">
-            <CardMark index={1} />
-            <h3 className="mb-4 border-b-2 border-bau-ink pb-2 text-xs font-bold uppercase tracking-widest">
+          <div className="list-surface">
+            <h3 className="flex items-center gap-2 border-b border-line px-4 py-3 text-sm font-medium text-ink-muted">
+              <SparkIcon className="h-4 w-4 text-primary-ink" />
               AI เห็นอะไรในรูป
             </h3>
-            <ul className="space-y-3">
+            <ul className="divide-y divide-line">
               {result.items.map((item, i) => (
                 <li
                   key={`${item.type}-${i}`}
-                  className="flex items-center gap-3 border-2 border-bau-ink bg-bau-canvas px-3 py-3"
+                  className="flex items-center gap-3 px-4 py-3"
                 >
-                  <span className="text-2xl" aria-hidden>
+                  <span
+                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-sunken text-lg"
+                    aria-hidden
+                  >
                     {WASTE_LABELS[item.type]?.emoji ?? '♻️'}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="font-bold">
+                    <p className="text-sm font-medium">
                       {item.name_th} × {item.count}
                     </p>
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-bau-ink/45">
+                    <p className="text-sm text-ink-subtle">
                       มั่นใจ {Math.round(item.confidence * 100)}%
                     </p>
                   </div>
                   <span
-                    className={`shrink-0 text-xl font-black tracking-tighter ${
-                      item.points > 0 ? 'text-bau-green' : 'text-bau-ink/20'
+                    className={`shrink-0 font-display text-sm font-semibold nums ${
+                      item.points > 0 ? 'text-primary-ink' : 'text-ink-subtle'
                     }`}
                   >
                     {item.points > 0 ? `+${formatPoints(item.points)}` : '0'}
@@ -195,10 +276,10 @@ export function SubmitForm() {
           </div>
         )}
 
-        <div className="space-y-3">
+        <div className="space-y-2">
           <button type="button" onClick={retake} className="btn-primary w-full">
-            <Camera className="h-5 w-5" strokeWidth={2.5} aria-hidden />
-            ส่งรูปอีกใบ
+            <ScanIcon className="h-5 w-5" />
+            สแกนอีกชิ้น
           </button>
           <Link href="/" className="btn-outline w-full">
             กลับหน้าแรก
@@ -211,25 +292,40 @@ export function SubmitForm() {
   // ------------------------------------------------------------- uploading
   if (phase === 'uploading') {
     return (
-      <div className="space-y-5">
+      <div className="space-y-4">
         {previewUrl && (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img
-            src={previewUrl}
-            alt="รูปที่กำลังส่ง"
-            className="aspect-[4/3] w-full border-2 border-bau-ink object-cover grayscale sm:border-4"
-          />
+          <div className="relative overflow-hidden rounded-card border border-line">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={previewUrl}
+              alt="รูปที่กำลังส่ง"
+              className="aspect-[4/3] w-full object-cover"
+            />
+            {/* Scrim rather than opacity on the image: dimming the photo itself
+                also dims the border and looks like a rendering fault. */}
+            <div
+              className="absolute inset-0 bg-canvas/60 backdrop-blur-[1px]"
+              aria-hidden
+            />
+            <ScanFrame />
+            <span className="absolute inset-0 flex items-center justify-center">
+              <span
+                className="h-10 w-10 animate-spin rounded-full border-[3px] border-primary/30 border-t-primary"
+                aria-hidden
+              />
+            </span>
+          </div>
         )}
 
-        <div className="relative overflow-hidden border-2 border-bau-ink bg-bau-blue p-8 text-center text-white shadow-hard-lg sm:border-4">
-          <ShapeField variant="blue" />
-          <div className="relative flex flex-col items-center gap-3">
-            <Spinner />
-            <p className="text-lg font-black">{WAITING_MESSAGES[waitingIndex]}</p>
-            <p className="text-xs font-bold uppercase tracking-widest text-white/70">
-              อย่าเพิ่งปิดหน้านี้
-            </p>
-          </div>
+        <div
+          className="card flex flex-col items-center gap-1 py-6 text-center"
+          role="status"
+          aria-live="polite"
+        >
+          <p className="text-sm font-medium text-ink">
+            {WAITING_MESSAGES[waitingIndex]}
+          </p>
+          <p className="text-sm text-ink-subtle">อย่าเพิ่งปิดหน้านี้</p>
         </div>
       </div>
     );
@@ -237,7 +333,7 @@ export function SubmitForm() {
 
   // -------------------------------------------------------- pick / preview
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {/*
         capture="environment" asks the phone to open the rear camera directly
         instead of the photo library. It is a hint, not a guarantee — the real
@@ -255,38 +351,41 @@ export function SubmitForm() {
       />
 
       {previewUrl ? (
-        /* eslint-disable-next-line @next/next/no-img-element */
-        <img
-          src={previewUrl}
-          alt="รูปขยะที่ถ่ายไว้"
-          className="aspect-[4/3] w-full border-2 border-bau-ink object-cover shadow-hard-lg sm:border-4"
-        />
+        <div className="relative overflow-hidden rounded-card border border-line bg-ink shadow-soft">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={previewUrl}
+            alt="รูปขยะที่ถ่ายไว้"
+            className="aspect-[4/3] w-full object-cover"
+          />
+          <ScanFrame />
+        </div>
       ) : (
+        /* The dropzone is the largest tap target in the app on purpose: it is
+           the first thing a new user must do, and it has to look pressable
+           without a button label competing with the CTA below. */
         <label
           htmlFor="waste-photo"
-          className="flex aspect-[4/3] w-full cursor-pointer flex-col items-center justify-center gap-4 border-2 border-dashed border-bau-ink bg-white text-center shadow-hard-md transition active:translate-x-[3px] active:translate-y-[3px] active:shadow-none sm:border-4"
+          className="group flex aspect-[4/3] w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-card border-2 border-dashed border-line-strong bg-surface px-6 text-center transition-colors hover:border-primary hover:bg-primary-soft/40"
         >
-          <span className="flex h-20 w-20 items-center justify-center rounded-full border-4 border-bau-ink bg-bau-yellow">
-            <Camera className="h-10 w-10" strokeWidth={2.5} aria-hidden />
+          <span className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-primary-soft text-primary-ink transition-transform duration-200 group-hover:scale-105">
+            <ScanIcon className="h-7 w-7" />
           </span>
-          <span className="text-2xl font-black uppercase tracking-tight">
-            แตะเพื่อถ่ายรูป
-          </span>
-          <span className="max-w-[16rem] text-sm font-medium leading-relaxed text-bau-ink/55">
+          <span className="mt-1 font-medium text-ink">แตะเพื่อสแกนขยะ</span>
+          <span className="max-w-[16rem] text-sm text-ink-subtle">
             วางขยะที่แยกแล้วบนพื้นโล่งๆ ถ่ายให้เห็นทุกชิ้นชัดเจน
           </span>
         </label>
       )}
 
       {phase === 'preview' && (
-        <div className="space-y-3">
-          <button
-            type="button"
-            onClick={submit}
-            className="btn-primary w-full !min-h-[4.5rem] !text-xl"
-          >
-            <Check className="h-7 w-7" strokeWidth={3} aria-hidden />
-            ส่งรูปนี้
+        <div className="space-y-2">
+          {/* "ยืนยัน", not "ส่งรูปนี้": the prototype's confirm step is the
+              moment the user accepts what the scan found, and the word has to
+              be the same one on the button they will tap next time. */}
+          <button type="button" onClick={submit} className="btn-primary w-full text-base">
+            <CheckIcon className="h-5 w-5" />
+            ยืนยัน
           </button>
           <button type="button" onClick={retake} className="btn-outline w-full">
             ถ่ายใหม่
@@ -297,30 +396,33 @@ export function SubmitForm() {
       {error && (
         <p
           role="alert"
-          className="border-2 border-bau-ink bg-bau-red px-4 py-4 text-center font-bold leading-relaxed text-white shadow-hard"
+          className="flex items-start gap-2 rounded-control border border-danger-line bg-danger-soft px-3.5 py-2.5 text-sm text-danger-ink"
         >
-          {error}
+          <AlertIcon className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>{error}</span>
         </p>
       )}
 
-      {/* Rules of the game, as a yellow "attention" plane. */}
-      <div className="relative border-2 border-bau-ink bg-bau-yellow p-5 shadow-hard sm:border-4">
-        <p className="mb-3 text-xs font-bold uppercase tracking-widest">
+      <div className="card">
+        <p className="flex items-center gap-2 text-sm font-medium text-ink">
+          <LeafIcon className="h-4 w-4 text-primary-ink" />
           เคล็ดลับให้ได้แต้มเต็ม
         </p>
-        <ul className="space-y-2 text-sm font-medium leading-relaxed">
+        <ul className="mt-3 space-y-2 text-sm text-ink-muted">
           {[
             'แยกขยะแต่ละชิ้นออกจากกัน อย่าวางซ้อนทับ',
             'ถ่ายในที่แสงสว่างพอ ไม่ย้อนแสง',
             'ถ่ายจากขยะจริงเท่านั้น ถ่ายจากหน้าจอจะไม่ผ่าน',
             'แยกถ่ายทีละชนิดได้ ส่งได้วันละ 5 ครั้ง',
           ].map((tip) => (
-            <li key={tip} className="flex gap-2.5">
+            <li key={tip} className="flex items-start gap-2.5">
+              {/* A dot, not a list-disc marker: Thai ascenders sit high enough
+                  that the browser's bullet lands off-centre against them. */}
               <span
+                className="mt-[0.6rem] h-1.5 w-1.5 shrink-0 rounded-full bg-leaf"
                 aria-hidden
-                className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-none bg-bau-ink"
               />
-              {tip}
+              <span>{tip}</span>
             </li>
           ))}
         </ul>

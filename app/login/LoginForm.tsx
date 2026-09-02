@@ -3,10 +3,15 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Mail } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { authErrorTh, callbackErrorTh } from '@/lib/authErrors';
-import { AuthError, FieldLabel, PasswordInput, Spinner } from '@/components/AuthUI';
+import {
+  AuthError,
+  FieldLabel,
+  PasswordInput,
+  Spinner,
+} from '@/components/AuthUI';
+import { CheckIcon } from '@/components/Icons';
 
 type Busy = null | 'password' | 'magic';
 
@@ -81,25 +86,20 @@ export function LoginForm() {
 
   if (magicSent) {
     return (
-      <div className="card text-center">
-        <span aria-hidden className="card-mark rounded-full bg-bau-blue" />
-        <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-none border-4 border-bau-ink bg-bau-blue text-white shadow-hard">
-          <Mail className="h-10 w-10" strokeWidth={2.5} aria-hidden />
-        </div>
-        <h2 className="text-2xl font-black">ส่งลิงก์ไปแล้ว</h2>
-        <p className="mt-3 font-medium leading-relaxed text-bau-ink/60">
-          เราส่งลิงก์เข้าสู่ระบบไปที่
-        </p>
-        <p className="mt-2 break-all border-2 border-bau-ink bg-bau-yellow px-3 py-2 font-bold">
-          {email}
-        </p>
-        <p className="mt-3 text-sm font-medium text-bau-ink/50">
+      <div className="card animate-fade-up text-center">
+        <span className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-full bg-primary-soft text-primary-ink">
+          <CheckIcon className="h-6 w-6" />
+        </span>
+        <h2 className="mt-3 font-semibold">ส่งลิงก์ไปแล้ว</h2>
+        <p className="mt-2 text-sm text-ink-subtle">เราส่งลิงก์เข้าสู่ระบบไปที่</p>
+        <p className="mt-1 break-all text-sm font-medium">{email}</p>
+        <p className="mt-2 text-sm text-ink-subtle">
           เปิดอีเมลแล้วกดลิงก์ได้เลย (เช็คในกล่องสแปมด้วยนะ)
         </p>
         <button
           type="button"
           onClick={() => setMagicSent(false)}
-          className="btn-outline mt-6 w-full"
+          className="btn-outline mt-4 w-full"
         >
           กลับไปหน้าเข้าสู่ระบบ
         </button>
@@ -109,9 +109,7 @@ export function LoginForm() {
 
   return (
     <div className="card">
-      <span aria-hidden className="card-mark rounded-full bg-bau-green" />
-
-      <form onSubmit={signInWithPassword} className="space-y-5">
+      <form onSubmit={signInWithPassword} className="space-y-4">
         <div>
           <FieldLabel htmlFor="email">อีเมล</FieldLabel>
           <input
@@ -132,7 +130,7 @@ export function LoginForm() {
             <FieldLabel htmlFor="password">รหัสผ่าน</FieldLabel>
             <Link
               href="/forgot-password"
-              className="mb-2 text-[11px] font-bold uppercase tracking-widest text-bau-blue underline decoration-2 underline-offset-4"
+              className="mb-1.5 text-sm text-ink-subtle hover:text-primary-ink"
             >
               ลืมรหัสผ่าน
             </Link>
@@ -163,12 +161,10 @@ export function LoginForm() {
         </button>
       </form>
 
-      <div className="my-6 flex items-center gap-3">
-        <span className="h-0.5 flex-1 bg-bau-ink" />
-        <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-bau-ink/50">
-          หรือ
-        </span>
-        <span className="h-0.5 flex-1 bg-bau-ink" />
+      <div className="my-4 flex items-center gap-3">
+        <span className="h-px flex-1 bg-line" />
+        <span className="text-xs text-ink-subtle">หรือ</span>
+        <span className="h-px flex-1 bg-line" />
       </div>
 
       <button
@@ -182,20 +178,17 @@ export function LoginForm() {
             <Spinner /> กำลังส่งลิงก์
           </>
         ) : (
-          <>
-            <Mail className="h-5 w-5" strokeWidth={2.5} aria-hidden />
-            ส่งลิงก์เข้าอีเมลแทน
-          </>
+          'ส่งลิงก์เข้าอีเมลแทน'
         )}
       </button>
 
       {error && <AuthError message={error} />}
 
-      <p className="mt-6 border-t-2 border-bau-ink pt-5 text-center text-sm font-medium text-bau-ink/60">
+      <p className="mt-5 border-t border-line pt-4 text-center text-sm text-ink-subtle">
         ยังไม่มีบัญชี?{' '}
         <Link
           href={`/register?next=${encodeURIComponent(next)}`}
-          className="font-black text-bau-green underline decoration-2 underline-offset-4"
+          className="font-semibold text-primary-ink hover:underline"
         >
           สมัครสมาชิก
         </Link>

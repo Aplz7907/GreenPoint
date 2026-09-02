@@ -1,5 +1,5 @@
 {
-  "name": "ecopoints",
+  "name": "green-point",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -13,7 +13,7 @@
     "@google/generative-ai": "^0.21.0",
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.46.1",
-    "lucide-react": "^1.24.0",
+    "lucide-react": "^1.28.0",
     "next": "^14.2.18",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

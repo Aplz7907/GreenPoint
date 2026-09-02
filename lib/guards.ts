@@ -168,3 +168,70 @@ export async function isSimilarImage(
 
   return data === true;
 }
+
+/** What /api/submit needs to know about the user before it prices a photo. */
+export interface ScoringContext {
+  /** Points earned over all time — drives the tier, never the balance. */
+  lifetimePoints: number;
+  /**
+   * The streak this submission will land on, counting today.
+   *
+   * compute_streak() reports the run as it stands *now*, which for someone who
+   * has not sent anything yet today ends yesterday. Submitting extends it, so
+   * the number the user is about to be shown — and paid for — is that run plus
+   * one. Getting this wrong by a day is the difference between "ต่อเนื่อง 7 วัน"
+   * unlocking the ×1.10 step today or tomorrow, which is exactly the kind of
+   * off-by-one a user notices immediately.
+   */
+  streakDays: number;
+  eventMultiplier: number;
+  eventName: string | null;
+}
+
+/**
+ * Reads the scoring context with the SERVICE ROLE.
+ *
+ * Not the user's own client: compute_streak() is deliberately not granted to
+ * authenticated (a user has no business asking about anyone's streak, including
+ * their own, through a function that takes a uuid).
+ */
+export async function getScoringContext(
+  admin: SupabaseClient,
+  userId: string
+): Promise<ScoringContext> {
+  const { data, error } = await admin.rpc('get_scoring_context', {
+    p_user_id: userId,
+  });
+
+  // A failure here must never block a submission — the photo is real and the
+  // base points are already known. Falling back to "no bonuses" pays the user
+  // slightly less than they were owed, which is the safe direction to be wrong
+  // in: it can be corrected later, and it can never be farmed.
+  if (error || !data || typeof data !== 'object') {
+    return {
+      lifetimePoints: 0,
+      streakDays: 1,
+      eventMultiplier: 1,
+      eventName: null,
+    };
+  }
+
+  const row = data as {
+    lifetime_points?: number;
+    streak_days?: number;
+    approved_today?: boolean;
+    event_name?: string | null;
+    event_multiplier?: number | string;
+  };
+
+  const lifetimePoints = Number(row.lifetime_points ?? 0);
+  const priorStreak = Number(row.streak_days ?? 0);
+  const eventMultiplier = Number(row.event_multiplier ?? 1);
+
+  return {
+    lifetimePoints: Number.isFinite(lifetimePoints) ? lifetimePoints : 0,
+    streakDays: row.approved_today ? priorStreak : priorStreak + 1,
+    eventMultiplier: Number.isFinite(eventMultiplier) ? eventMultiplier : 1,
+    eventName: row.event_name ?? null,
+  };
+}

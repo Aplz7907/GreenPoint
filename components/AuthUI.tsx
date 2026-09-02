@@ -1,20 +1,19 @@
 'use client';
 
-import { Eye, EyeOff, Loader2, TriangleAlert } from 'lucide-react';
+import { AlertIcon } from '@/components/Icons';
 
 export function Spinner() {
-  return <Loader2 className="h-5 w-5 animate-spin" strokeWidth={3} aria-hidden />;
+  return <span className="spinner" aria-hidden />;
 }
 
-/** Errors are the one place Bauhaus red belongs: a solid block you cannot skim past. */
 export function AuthError({ message }: { message: string }) {
   return (
     <p
       role="alert"
-      className="mt-4 flex items-start gap-2 rounded-none border-2 border-bau-ink bg-bau-red px-4 py-3 text-sm font-bold leading-relaxed text-white shadow-hard-sm"
+      className="mt-4 flex items-start gap-2 rounded-control border border-danger-line bg-danger-soft px-3.5 py-2.5 text-sm text-danger-ink"
     >
-      <TriangleAlert className="mt-0.5 h-5 w-5 shrink-0" strokeWidth={3} aria-hidden />
-      {message}
+      <AlertIcon className="mt-0.5 h-4 w-4 shrink-0" />
+      <span>{message}</span>
     </p>
   );
 }
@@ -68,14 +67,9 @@ export function PasswordInput({
       <button
         type="button"
         onClick={onToggleVisible}
-        aria-label={visible ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}
-        className="absolute right-0 top-0 flex h-full w-14 items-center justify-center border-l-2 border-bau-ink bg-bau-yellow text-bau-ink transition active:bg-bau-yellow/80"
+        className="absolute bottom-1.5 right-1.5 top-1.5 rounded-[0.5rem] px-2.5 text-xs font-medium text-ink-muted transition-colors hover:bg-surface-sunken hover:text-ink"
       >
-        {visible ? (
-          <EyeOff className="h-5 w-5" strokeWidth={2.5} />
-        ) : (
-          <Eye className="h-5 w-5" strokeWidth={2.5} />
-        )}
+        {visible ? 'ซ่อน' : 'แสดง'}
       </button>
     </div>
   );

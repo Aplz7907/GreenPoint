@@ -2,11 +2,11 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Mail } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { authErrorTh } from '@/lib/authErrors';
 import { AuthError, FieldLabel, Spinner } from '@/components/AuthUI';
 import { AuthShell } from '@/components/AuthShell';
+import { CheckIcon, ChevronLeftIcon } from '@/components/Icons';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
@@ -42,31 +42,25 @@ export default function ForgotPasswordPage() {
     <AuthShell
       title="ลืมรหัสผ่าน"
       subtitle="ใส่อีเมลที่ใช้สมัคร แล้วเราจะส่งลิงก์ไปตั้งรหัสผ่านใหม่ให้"
-      band="yellow"
     >
       {sent ? (
-        <div className="card text-center">
-          <span aria-hidden className="card-mark rounded-full bg-bau-yellow" />
-          <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-none border-4 border-bau-ink bg-bau-yellow shadow-hard">
-            <Mail className="h-10 w-10" strokeWidth={2.5} aria-hidden />
-          </div>
-          <h2 className="text-2xl font-black">ส่งลิงก์ไปแล้ว</h2>
-          <p className="mt-3 font-medium leading-relaxed text-bau-ink/60">
+        <div className="card animate-fade-up text-center">
+          <span className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-full bg-primary-soft text-primary-ink">
+            <CheckIcon className="h-6 w-6" />
+          </span>
+          <h2 className="mt-3 font-semibold">ส่งลิงก์ไปแล้ว</h2>
+          <p className="mt-2 text-sm text-ink-subtle">
             ถ้ามีบัญชีที่ใช้อีเมลนี้ เราส่งลิงก์ตั้งรหัสผ่านใหม่ไปให้แล้ว
             (เช็คในกล่องสแปมด้วยนะ)
           </p>
-          <p className="mt-3 break-all border-2 border-bau-ink bg-bau-muted px-3 py-2 font-bold">
-            {email}
-          </p>
-          <Link href="/login" className="btn-outline mt-6 w-full">
+          <p className="mt-1 break-all text-sm font-medium">{email}</p>
+          <Link href="/login" className="btn-outline mt-4 w-full">
             กลับไปหน้าเข้าสู่ระบบ
           </Link>
         </div>
       ) : (
         <div className="card">
-          <span aria-hidden className="card-mark rounded-none bg-bau-yellow" />
-
-          <form onSubmit={sendReset} className="space-y-5">
+          <form onSubmit={sendReset} className="space-y-4">
             <div>
               <FieldLabel htmlFor="email">อีเมล</FieldLabel>
               <input
@@ -99,12 +93,13 @@ export default function ForgotPasswordPage() {
 
           {error && <AuthError message={error} />}
 
-          <p className="mt-6 border-t-2 border-bau-ink pt-5 text-center">
+          <p className="mt-5 border-t border-line pt-4 text-center">
             <Link
               href="/login"
-              className="text-xs font-bold uppercase tracking-widest text-bau-blue underline decoration-2 underline-offset-4"
+              className="inline-flex items-center gap-1 text-sm text-ink-subtle hover:text-primary-ink"
             >
-              ← กลับไปหน้าเข้าสู่ระบบ
+              <ChevronLeftIcon className="h-4 w-4" />
+              กลับไปหน้าเข้าสู่ระบบ
             </Link>
           </p>
         </div>

@@ -1,0 +1,21 @@
+{
+  // VSCode's built-in CSS parser doesn't know Tailwind's at-rules, so it flags
+  // @tailwind/@apply/@layer in app/globals.css as "Unknown at rule". They are
+  // valid — PostCSS strips them at build time. Silence the false positives.
+  "css.lint.unknownAtRules": "ignore",
+  "scss.lint.unknownAtRules": "ignore",
+  "less.lint.unknownAtRules": "ignore",
+
+  // Let the Tailwind extension drive completion/linting for CSS instead.
+  "tailwindCSS.experimental.classRegex": [
+    ["@apply\\s+([^;]*);", "([^\\s]+)"]
+  ],
+  "files.associations": {
+    "*.css": "tailwindcss"
+  },
+
+  // Use the TypeScript version pinned in the repo, not VSCode's bundled one,
+  // so the editor agrees with `bun run typecheck`.
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true
+}

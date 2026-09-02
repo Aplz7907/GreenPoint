@@ -2,107 +2,405 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ==========================================================================
+   Tokens
+   --------------------------------------------------------------------------
+   Light is the primary theme; `.dark` re-declares the same names and nothing
+   else in the app changes. Values are space-separated RGB channels so Tailwind
+   can apply opacity modifiers to them.
+   ========================================================================== */
+
+:root {
+  color-scheme: light;
+
+  --c-canvas: 241 248 233; /* #F1F8E9 */
+  --c-surface: 255 255 255;
+  --c-surface-sunken: 237 245 225;
+
+  --c-line: 220 231 208;
+  --c-line-strong: 195 212 180;
+
+  /*
+   * Contrast on these is measured against the CANVAS, not against white. The
+   * canvas is #F1F8E9, which is darker than white, so a tone that just clears
+   * 4.5:1 on a card fails on the page background — and most secondary text in
+   * this app sits on the page background.
+   */
+  --c-ink: 27 46 27; /* #1B2E1B */
+  --c-ink-muted: 76 97 76; /* 6.4:1 on canvas */
+  /* Tuned against `surface-sunken`, its worst background — inactive segmented
+     tabs and spent reward codes sit on it. Clearing 4.5:1 there clears it
+     everywhere else too. */
+  --c-ink-subtle: 92 114 92; /* 4.67:1 on sunken, 4.82:1 on canvas */
+
+  --c-primary: 46 125 50; /* #2E7D32 — 5.1:1 with white on top */
+  --c-primary-hover: 37 100 40;
+  --c-primary-on: 255 255 255;
+  /* #E8F5E9, not #E3F1E4: the tint carries `primary-ink` as label text in every
+     badge and chip, and the darker tint left that pairing at 4.39:1. */
+  --c-primary-soft: 232 245 233;
+  --c-primary-ink: 46 125 50; /* 4.6:1 on primary-soft */
+
+  --c-leaf: 102 187 106; /* #66BB6A */
+  --c-mint: 165 214 167; /* #A5D6A7 */
+
+  /* Same pale green as --c-primary-soft; "approved" and "brand" are the same
+     tint here by design, and letting them drift apart by four RGB points would
+     only read as a rendering inconsistency. */
+  --c-ok-soft: 232 245 233;
+  --c-ok-ink: 31 107 51;
+  --c-ok-line: 191 224 196;
+
+  --c-warn-soft: 253 243 216;
+  --c-warn-ink: 138 90 0;
+  --c-warn-line: 240 223 175;
+
+  --c-danger: 179 38 30;
+  --c-danger-soft: 253 232 232;
+  --c-danger-ink: 179 38 30;
+  --c-danger-line: 243 201 199;
+
+  --c-info-soft: 229 239 251;
+  --c-info-ink: 26 95 180;
+
+  /* The fourth tint the home tiles need. Three would have meant reusing one
+     colour twice in a row of four, which reads as an accident rather than as a
+     grouping. Violet is the only hue left that is neither a status (green ok,
+     amber warn, red danger) nor already spoken for by the brand. */
+  --c-accent-soft: 237 233 250;
+  --c-accent-ink: 92 63 168; /* 6.0:1 on accent-soft */
+
+  /**
+   * The balance panel is a filled green surface in BOTH themes, so it needs its
+   * own pair rather than reusing --c-primary: in dark mode primary lightens to
+   * carry dark labels, and white text on that is a 3:1 failure. Here the fill
+   * instead darkens, and the ink stays light.
+   */
+  /**
+   * The prototype's home screen opens on a pale outdoor illustration — sky at
+   * the top fading into grass — with the brand headline on it in dark green.
+   * These two are that band. It is a LIGHT surface carrying dark ink, which is
+   * the opposite of --c-hero-*, so it cannot borrow those.
+   */
+  --c-sky-from: 219 238 247;
+  --c-sky-to: 226 242 216;
+  --c-sky-ink: 27 61 32;
+
+  --c-hero-from: 46 125 50;
+  --c-hero-to: 27 94 32;
+  --c-hero-ink: 255 255 255;
+  --c-hero-muted: 232 245 233; /* 4.6:1 on the lighter end of the gradient */
+
+  /* Shadows carry a green cast so they read as depth under a green card
+     rather than as grime. */
+  --c-shadow: 27 46 27;
+
+  /**
+   * The whole `url()` lives in the variable, not just the colour: a data URI is
+   * a separate document, so `var()` inside the SVG markup would never resolve.
+   *
+   * `--leaf-field-image-hero` is deliberately NOT re-declared in `.dark`. It
+   * sits on the filled green panel, which is dark green in both themes, so it
+   * needs a light stroke in both — flipping it with the theme would make the
+   * texture disappear against its own background in light mode.
+   */
+  --leaf-field-image-hero: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='72' viewBox='0 0 72 72'%3E%3Cg fill='none' stroke='%23FFFFFF' stroke-opacity='0.10' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='M50 14c-14 0-22 8-22 18 0 6 4 10 10 10 13 0 20-12 20-24 0-2-4-4-8-4z'/%3E%3Cpath d='M22 52c4-10 12-16 22-20'/%3E%3Cpath d='M8 30c8 0 12 4 12 10'/%3E%3C/g%3E%3C/svg%3E");
+  --leaf-field-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='72' viewBox='0 0 72 72'%3E%3Cg fill='none' stroke='%232E7D32' stroke-opacity='0.07' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='M50 14c-14 0-22 8-22 18 0 6 4 10 10 10 13 0 20-12 20-24 0-2-4-4-8-4z'/%3E%3Cpath d='M22 52c4-10 12-16 22-20'/%3E%3Cpath d='M8 30c8 0 12 4 12 10'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+.dark {
+  color-scheme: dark;
+
+  --c-canvas: 15 23 17;
+  --c-surface: 23 32 26;
+  --c-surface-sunken: 18 27 21;
+
+  --c-line: 42 56 45;
+  --c-line-strong: 58 75 62;
+
+  --c-ink: 231 240 229;
+  --c-ink-muted: 169 188 169;
+  --c-ink-subtle: 138 160 140;
+
+  /* The fill lightens and the label on top goes dark. White on a mid green is
+     ~3:1 — the single most common dark-mode contrast failure. */
+  --c-primary: 106 191 110;
+  --c-primary-hover: 130 206 133;
+  --c-primary-on: 11 26 13;
+  --c-primary-soft: 27 51 32;
+  --c-primary-ink: 143 214 148;
+
+  --c-leaf: 102 187 106;
+  --c-mint: 165 214 167;
+
+  /* Dark mode keeps the band a band — same role, night version. A pale sky
+     here would be the one blinding rectangle on the screen. */
+  --c-sky-from: 21 38 45;
+  --c-sky-to: 20 36 25;
+  --c-sky-ink: 214 236 216;
+
+  --c-ok-soft: 22 50 28;
+  --c-ok-ink: 143 214 148;
+  --c-ok-line: 36 77 44;
+
+  --c-warn-soft: 51 40 15;
+  --c-warn-ink: 240 206 122;
+  --c-warn-line: 77 61 24;
+
+  /* Stays a deep red rather than lightening with the rest of the dark palette:
+     `--c-danger` is a FILL that carries white text in .btn-danger, and a light
+     red under white lands at ~3:1. `--c-danger-ink` below is the light one,
+     and that is the token used for text. */
+  --c-danger: 198 40 40;
+  --c-danger-soft: 58 29 28;
+  --c-danger-ink: 243 169 164;
+  --c-danger-line: 87 42 40;
+
+  --c-info-soft: 22 38 58;
+  --c-info-ink: 148 189 240;
+
+  --c-accent-soft: 38 32 58;
+  --c-accent-ink: 190 175 240;
+
+  /* Same panel, deeper — a #2E7D32 block glares against a near-black page. */
+  --c-hero-from: 30 77 36;
+  --c-hero-to: 20 58 25;
+  --c-hero-ink: 231 240 229;
+  --c-hero-muted: 183 205 185;
+
+  --c-shadow: 0 0 0;
+
+  --leaf-field-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='72' viewBox='0 0 72 72'%3E%3Cg fill='none' stroke='%23A5D6A7' stroke-opacity='0.09' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='M50 14c-14 0-22 8-22 18 0 6 4 10 10 10 13 0 20-12 20-24 0-2-4-4-8-4z'/%3E%3Cpath d='M22 52c4-10 12-16 22-20'/%3E%3Cpath d='M8 30c8 0 12 4 12 10'/%3E%3C/g%3E%3C/svg%3E");
+}
+
 @layer base {
   html {
-    overflow-x: hidden;
     -webkit-tap-highlight-color: transparent;
+    scroll-behavior: smooth;
   }
 
   body {
-    @apply bg-bau-canvas text-bau-ink antialiased;
+    @apply bg-canvas text-ink antialiased;
   }
 
-  /* Thai has no uppercase, so `uppercase` alone cannot carry the constructivist
-     voice here. Weight and tracking do that work instead — which is why every
-     heading below leans on font-black rather than text-transform. */
   h1,
   h2,
   h3 {
-    @apply font-black tracking-tight;
+    @apply font-display font-semibold tracking-tight text-ink;
+  }
+
+  /* One focus ring for the whole app, on the token colour, offset from the
+     element so it survives on both themes. */
+  :focus-visible {
+    @apply outline-none ring-2 ring-primary ring-offset-2 ring-offset-canvas;
+  }
+
+  ::selection {
+    @apply bg-primary/20;
+  }
+
+  /* Every animation here is decorative. None of it should run for someone who
+     has asked the OS to stop moving things. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }
 
 @layer components {
-  /* ---------------------------------------------------------------------
-     BUTTONS — a Bauhaus button is a physical object. It has thickness (the
-     border), it casts a hard shadow, and when you press it, it moves into
-     the page and the shadow vanishes. Nothing fades.
-     --------------------------------------------------------------------- */
+  /* ------------------------------------------------------------------ buttons
+     48px minimum height throughout: this is a one-handed, outdoors, phone-first
+     app and 48px is the smallest target that is reliably hittable while walking
+     to a bin.
+
+     The `active:scale` is a reversal of an earlier decision to keep transforms
+     off buttons entirely (a transform promotes the element to its own composite
+     layer on every press). It is back because the brief asks for a playful
+     feel, and a 1.5% dip on press is the cheapest way to get one; it only fires
+     while a finger is down. Under prefers-reduced-motion the dip still happens
+     but stops being animated, which is the intent — the objection is to motion,
+     not to state changes. If press latency ever regresses on low-end Android,
+     this is the first thing to take back out. */
   .btn {
-    @apply inline-flex min-h-[3.5rem] items-center justify-center gap-2
-           border-2 border-bau-ink px-6 text-base font-bold tracking-wide
-           shadow-hard transition-all duration-200 ease-out
-           active:translate-x-[3px] active:translate-y-[3px] active:shadow-none
-           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bau-ink focus-visible:ring-offset-2
-           disabled:pointer-events-none disabled:opacity-40
-           sm:border-4 sm:shadow-hard-md;
+    @apply inline-flex min-h-[3rem] items-center justify-center gap-2
+           rounded-control px-5 text-sm font-medium
+           transition-[background-color,border-color,color,box-shadow,transform]
+           duration-150 active:scale-[0.985]
+           disabled:pointer-events-none disabled:opacity-45 disabled:shadow-none;
   }
 
   .btn-primary {
-    @apply btn rounded-none bg-bau-green text-white hover:bg-bau-green-dark;
+    @apply btn bg-primary text-primary-on shadow-glow hover:bg-primary-hover;
   }
 
-  .btn-blue {
-    @apply btn rounded-none bg-bau-blue text-white hover:bg-bau-blue/90;
-  }
-
-  .btn-yellow {
-    @apply btn rounded-none bg-bau-yellow text-bau-ink hover:bg-bau-yellow/90;
+  .btn-secondary {
+    @apply btn bg-primary-soft text-primary-ink hover:bg-mint/50;
   }
 
   .btn-outline {
-    @apply btn rounded-none bg-white text-bau-ink hover:bg-bau-muted;
+    @apply btn border border-line bg-surface text-ink hover:border-line-strong hover:bg-surface-sunken;
+  }
+
+  .btn-ghost {
+    @apply btn px-3 text-ink-muted hover:bg-surface-sunken hover:text-ink;
   }
 
   .btn-danger {
-    @apply btn rounded-none bg-bau-red text-white hover:bg-bau-red/90;
+    @apply btn bg-danger text-white hover:opacity-90;
   }
 
-  /* The one soft shape allowed: a pill, used only when an action is meant to
-     read as a stamp rather than a block. */
-  .btn-pill {
-    @apply rounded-full;
+  .btn-sm {
+    @apply min-h-[2.25rem] px-3.5 text-sm;
   }
 
-  /* ---------------------------------------------------------------------
-     CARDS — white plane, thick outline, hard shadow. Depth by stacking.
-     --------------------------------------------------------------------- */
+  /* -------------------------------------------------------------------- cards
+     16px radius, hairline border AND a soft shadow: the border keeps the card
+     legible in dark mode where the shadow all but disappears, the shadow does
+     the lifting in light mode. */
   .card {
-    @apply relative rounded-none border-2 border-bau-ink bg-white p-5
-           shadow-hard-md sm:border-4 sm:shadow-hard-lg;
+    @apply rounded-card border border-line bg-surface p-5 shadow-soft;
   }
 
-  /* Corner marker: the small geometric punctuation that tells you this is a
-     composition and not a div. Colour is set per-instance. */
-  .card-mark {
-    @apply absolute right-3 top-3 h-4 w-4;
+  /** Rows of records — one border and one radius around the whole group. */
+  .list-surface {
+    @apply divide-y divide-line overflow-hidden rounded-card border border-line bg-surface shadow-soft;
   }
 
-  /* ---------------------------------------------------------------------
-     FORM FIELDS — an input is a slot cut into the page, not a soft pillow.
-     --------------------------------------------------------------------- */
+  /* ------------------------------------------------------------------- forms */
   .input {
-    @apply w-full rounded-none border-2 border-bau-ink bg-white px-4 py-4
-           text-base font-medium text-bau-ink
-           placeholder:font-normal placeholder:text-bau-ink/35
-           focus:outline-none focus:ring-4 focus:ring-bau-yellow;
+    @apply w-full rounded-control border border-line-strong bg-surface px-3.5 py-3
+           text-base text-ink placeholder:text-ink-subtle
+           transition-colors duration-150
+           focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25 focus:ring-offset-0;
   }
 
   .field-label {
-    @apply mb-2 block text-xs font-bold uppercase tracking-widest text-bau-ink/70;
+    @apply mb-1.5 block text-sm font-medium text-ink-muted;
   }
 
-  /* ---------------------------------------------------------------------
-     BADGES — solid colour block, black outline, no rounding.
-     --------------------------------------------------------------------- */
+  .field-hint {
+    @apply mt-1.5 text-sm text-ink-subtle;
+  }
+
+  /* ------------------------------------------------------------------ chrome */
   .badge {
-    @apply inline-flex items-center rounded-none border-2 border-bau-ink px-2.5 py-0.5
-           text-xs font-bold uppercase tracking-wider;
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium;
   }
 
-  /* Section rhythm: every major band is separated by a hard rule, the way a
-     poster is divided into registers. */
-  .rule {
-    @apply border-b-4 border-bau-ink;
+  /** Sticky page header. The blur keeps content readable as it scrolls under. */
+  .app-header {
+    @apply sticky top-0 z-30 border-b border-line bg-surface/85 backdrop-blur-md;
+  }
+
+  .section-title {
+    @apply text-base font-semibold text-ink;
+  }
+
+  /* CSS-only spinner. Replaces an imported icon component with one element. */
+  .spinner {
+    @apply h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-current border-t-transparent;
+  }
+
+  /** Thin progress track used for tier and reward progress. */
+  .meter {
+    @apply h-2 w-full overflow-hidden rounded-full bg-surface-sunken;
+  }
+
+  .meter-fill {
+    @apply h-full rounded-full bg-gradient-to-r from-primary to-leaf transition-[width] duration-500 ease-out;
+  }
+
+  /* ------------------------------------------------------------------- home */
+
+  /**
+   * The illustrated band the home screen opens on.
+   *
+   * The prototype puts a drawn park scene here. We get the same read out of a
+   * two-stop gradient plus the leaf texture that already exists — a hand-drawn
+   * PNG would be ~200KB on the one screen that must feel instant, and it would
+   * need a second version for dark mode.
+   */
+  .hero-band {
+    @apply relative overflow-hidden bg-gradient-to-b from-sky-from to-sky-to text-sky-ink;
+  }
+
+  /**
+   * One tile in the home screen's four-across shortcut row.
+   *
+   * Four across on a 320px screen leaves ~68px per tile, so the label gets
+   * `text-[11px]` and one line: at 12px "แลกของรางวัล" wraps to two and the row
+   * stops being a row of equals.
+   */
+  .tile {
+    @apply flex flex-col items-center justify-start gap-2 rounded-card border border-line bg-surface px-1 py-3.5 text-center shadow-soft transition-colors hover:border-line-strong;
+  }
+
+  /**
+   * No `truncate` here. At four across on a 320px screen "แลกของรางวัล" does
+   * not fit on one line, and clipping it to "แลกของรา…" costs the tile the one
+   * thing it has to communicate. It wraps to two lines instead; the grid keeps
+   * the four tiles the same height.
+   */
+  .tile-label {
+    @apply block w-full px-0.5 text-[11px] font-medium leading-tight text-ink;
+  }
+
+  /* ------------------------------------------------------------- segmented */
+
+  /** The track. Its children are `.seg-item`. */
+  .seg {
+    @apply flex gap-1 rounded-full bg-surface-sunken p-1;
+  }
+
+  .seg-item {
+    @apply flex-1 rounded-full px-3 py-2 text-center text-sm transition-colors;
+  }
+
+  /**
+   * Filled dark green, white label — the prototype's selected tab is the one
+   * high-contrast element on that screen, and a tinted pill would not survive
+   * being looked at next to the green points card above it.
+   */
+  .seg-item-on {
+    @apply bg-primary font-medium text-primary-on shadow-soft;
+  }
+
+  .seg-item-off {
+    @apply text-ink-subtle hover:text-ink-muted;
+  }
+}
+
+@layer utilities {
+  /**
+   * Tiled leaf motif. Deliberately at ~5% opacity and 72px pitch: at that
+   * strength it registers as texture on a large surface and is invisible
+   * behind text, which is the only way a pattern survives being put under a
+   * balance figure.
+   */
+  .leaf-field {
+    background-image: var(--leaf-field-image);
+    background-size: 72px 72px;
+  }
+
+  /** The same motif for the filled green panels. See the variable's note. */
+  .leaf-field-hero {
+    background-image: var(--leaf-field-image-hero);
+    background-size: 72px 72px;
+  }
+
+  /** Keeps short headings from breaking to a one-word orphan line. */
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  /** Digits that do not jitter as a counter changes. */
+  .nums {
+    font-variant-numeric: tabular-nums;
   }
 }
