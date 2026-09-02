@@ -21,6 +21,18 @@ import type {
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+/**
+ * One request here does four slow things in a row: upload the photo to storage,
+ * hash it with sharp, ask Gemini to read it, and write the submission. The happy
+ * path is a few seconds, but gemini.ts retries once after 1.5s on a 503 — which
+ * Gemini returns often enough — and that path can pass the 10s a serverless
+ * host defaults to, killing the request with a 504 the user cannot act on.
+ *
+ * Raised to the platform maximum. Nothing here is billed for time it does not
+ * use, so a ceiling costs nothing and only removes a failure mode.
+ */
+export const maxDuration = 60;
+
 const MAX_BYTES = 10 * 1024 * 1024; // 10 MB — matches the storage bucket limit.
 const ALLOWED_MIME = [
   'image/jpeg',
