@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
 import { Spinner } from '@/components/AuthUI';
 import { AlertIcon, CheckIcon, GiftIcon } from '@/components/Icons';
 import { formatPoints } from '@/lib/copy';
@@ -60,6 +59,8 @@ export function RewardsList({
     setConfirmId(null);
     setBusyId(reward.id);
 
+    // Deferred on purpose — see the note in lib/supabase/client.ts.
+    const { createClient } = await import('@/lib/supabase/client');
     const supabase = createClient();
 
     // The client sends only the reward id. The database checks the balance,

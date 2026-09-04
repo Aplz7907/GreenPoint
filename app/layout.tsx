@@ -20,7 +20,10 @@ const inter = Inter({
 
 const poppins = Poppins({
   subsets: ['latin'],
-  weight: ['500', '600', '700'],
+  // 600 and 700 only. `font-display` is only ever paired with font-semibold
+  // and font-bold in this codebase, so the 500 face was a third woff2 that
+  // downloaded on every visit and rendered nothing.
+  weight: ['600', '700'],
   display: 'swap',
   variable: '--font-poppins',
 });

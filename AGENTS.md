@@ -218,6 +218,25 @@ existing explanations when editing nearby code.
 - Most routes 303-redirect to `/login` when signed out, so `curl` alone cannot
   verify them. Seeing the app requires a real session.
 
+## Deployment
+
+Vercel, auto-deploying from `main`. A code push is all a deploy needs; an
+**environment variable change requires a manual Redeploy**, because
+`NEXT_PUBLIC_*` values are baked in at build time and never read at runtime.
+
+`vercel.json` pins functions to **`icn1` (Seoul)**. JSON cannot carry a comment,
+so the reason lives here: the Supabase project is in **ap-northeast-2 (Seoul)**,
+and every navigation makes three *sequential* Supabase round trips — the
+middleware's `getUser()`, the page's `getProfile()`, then its `Promise.all`. On
+the default `iad1` those three cross the Pacific and cost roughly 600 ms before
+anything paints; in the same region as the database they cost single-digit
+milliseconds. Seoul also happens to be far closer to Thai users than US East, so
+it wins on both legs.
+
+**If the Supabase project ever moves region, move this with it.** Picking a
+region by "closest to the user" while the database sits elsewhere is slower than
+leaving the default alone.
+
 ## Current known state
 
 - `schema.sql` adds `faculties.campus_th` and reseeds the faculty list with the

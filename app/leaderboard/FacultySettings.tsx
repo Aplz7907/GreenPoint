@@ -3,7 +3,6 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 
-import { createClient } from '@/lib/supabase/client';
 import type { Faculty } from '@/lib/types';
 import { FacultySelect } from '@/components/FacultySelect';
 
@@ -49,6 +48,8 @@ export function FacultySettings({
     setError(null);
     setSaved(false);
 
+    // Deferred on purpose — see the note in lib/supabase/client.ts.
+    const { createClient } = await import('@/lib/supabase/client');
     const supabase = createClient();
     const {
       data: { user },
