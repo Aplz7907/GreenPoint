@@ -4,21 +4,15 @@ import type { Faculty } from '@/lib/types';
 /**
  * The faculty picker, shared by registration and the leaderboard settings.
  *
- * มทร.อีสาน runs five campuses whose unit names overlap heavily — ขอนแก่น's
- * คณะวิศวกรรมศาสตร์ sits two rows from นครราชสีมา's คณะวิศวกรรมศาสตร์และเทคโนโลยี
- * — so the options are grouped by campus rather than listed flat. A student who
- * picks the wrong one competes on the wrong board for the rest of the term.
+ * Only มทร.อีสาน ศูนย์กลางนครราชสีมา is served, so today the list is one
+ * labelled group. The grouping stays because the label is what tells a student
+ * the board they are joining is the นครราชสีมา one, and because adding a
+ * วิทยาเขต back is then a one-line change here plus a seed in schema.sql.
  */
 
-/** Campus order: the ศูนย์กลาง first, then the four วิทยาเขต. Sorting these by
- *  name would open the list on ขอนแก่น, which is not where most students are. */
-const CAMPUS_ORDER = [
-  'นครราชสีมา',
-  'ขอนแก่น',
-  'สกลนคร',
-  'สุรินทร์',
-  'ร้อยเอ็ด ณ ทุ่งกุลาร้องไห้',
-];
+/** Campus order: the ศูนย์กลาง first, then any วิทยาเขต, in this order rather
+ *  than alphabetically — a campus not listed here still renders, after these. */
+const CAMPUS_ORDER = ['นครราชสีมา'];
 
 function campusRank(campus: string) {
   // The unlabelled bucket sorts first; it only ever exists on its own.

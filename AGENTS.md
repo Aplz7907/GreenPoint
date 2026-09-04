@@ -221,8 +221,14 @@ existing explanations when editing nearby code.
 ## Current known state
 
 - `schema.sql` adds `faculties.campus_th` and reseeds the faculty list with the
-  real **มทร.อีสาน (RMUTI)** units across its campuses. **It has not been applied
-  to the live Supabase project yet** — the running database still holds the old
-  generic placeholder list. `lib/faculties.ts` handles both shapes.
-- `วิทยาเขตร้อยเอ็ด ณ ทุ่งกุลาร้องไห้` has no teaching units of its own and is not
-  seeded; a ready snippet sits in the tuning-knobs comment block of `schema.sql`.
+  real **มทร.อีสาน (RMUTI)** units. **It has not been applied to the live Supabase
+  project yet** — the running database still holds the old generic placeholder
+  list. `lib/faculties.ts` handles both shapes.
+- **Only `ศูนย์กลางนครราชสีมา` is in scope.** The other วิทยาเขต (ขอนแก่น, สกลนคร,
+  สุรินทร์, ร้อยเอ็ด) are not seeded, and because earlier versions of `schema.sql`
+  did seed some of them the file ends the faculty section with a retire
+  statement — `is_active = false where campus_th is distinct from 'นครราชสีมา'`,
+  never DELETE, since `profiles.faculty_id` may point at those rows. `is_active`
+  is what both the RLS read policy and `get_faculty_leaderboard()` filter on, so
+  retiring takes a campus out of the picker and the boards in one move.
+  `CAMPUS_ORDER` in `components/FacultySelect.tsx` lists นครราชสีมา only.

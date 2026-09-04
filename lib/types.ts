@@ -26,7 +26,7 @@ export interface Profile {
 export interface Faculty {
   id: number;
   name_th: string;
-  /** Which มทร.อีสาน campus the unit belongs to. Null only on the retired
+  /** Which มทร.อีสาน campus the unit belongs to. Null on the retired
    *  placeholder rows, which no picker shows. */
   campus_th: string | null;
   is_active: boolean;

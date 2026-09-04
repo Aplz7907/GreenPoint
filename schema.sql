@@ -1,4 +1,4 @@
--- ============================================================================
+ -- ============================================================================
 -- Green Point — schema.sql
 -- Run this whole file in the Supabase SQL Editor (Dashboard → SQL Editor → New query).
 -- It is idempotent: safe to re-run.
@@ -597,10 +597,10 @@ on conflict (id) do update
 create table if not exists public.faculties (
   id        serial primary key,
   name_th   text unique not null,
-  -- Which มทร.อีสาน campus the unit belongs to. Five campuses run units whose
-  -- names differ by only a word or two — Khon Kaen's คณะวิศวกรรมศาสตร์ against
-  -- Nakhon Ratchasima's คณะวิศวกรรมศาสตร์และเทคโนโลยี — so the picker has to be
-  -- able to say where each one is or students will pick the wrong board.
+  -- Which มทร.อีสาน campus the unit belongs to. Only ศูนย์กลางนครราชสีมา is
+  -- served today, but the column stays: it is what the picker groups and labels
+  -- by, and it is the marker the retire statements below use to take a campus
+  -- out of every board without deleting rows students already point at.
   campus_th text,
   is_active boolean not null default true
 );
@@ -632,34 +632,34 @@ update public.faculties
    set is_active = false
  where campus_th is null;
 
--- มทร.อีสาน, all five campuses. Names are the units' own, without the
--- "มทร.อีสาน" prefix, since the whole app belongs to one university.
+-- มทร.อีสาน ศูนย์กลางนครราชสีมา — the only campus this deployment serves. Names
+-- are the units' own, without the "มทร.อีสาน" prefix, since the whole app
+-- belongs to one university.
 insert into public.faculties (name_th, campus_th) values
-  -- ศูนย์กลางนครราชสีมา
   ('คณะวิศวกรรมศาสตร์และเทคโนโลยี',        'นครราชสีมา'),
   ('คณะบริหารธุรกิจ',                       'นครราชสีมา'),
   ('คณะวิทยาศาสตร์และศิลปศาสตร์',          'นครราชสีมา'),
   ('คณะสถาปัตยกรรมศาสตร์และศิลปสร้างสรรค์', 'นครราชสีมา'),
   ('คณะระบบรางและการขนส่ง',                'นครราชสีมา'),
   ('วิทยาลัยนวัตกรรมวิชาชีพ',               'นครราชสีมา'),
-  ('สถาบันสหสรรพศาสตร์',                    'นครราชสีมา'),
-  -- วิทยาเขตขอนแก่น
-  ('คณะวิศวกรรมศาสตร์',                     'ขอนแก่น'),
-  ('คณะครุศาสตร์อุตสาหกรรม',                'ขอนแก่น'),
-  ('คณะบริหารธุรกิจและเทคโนโลยีสารสนเทศ',   'ขอนแก่น'),
-  ('วิทยาลัยไทยไมส์เตอร์',                  'ขอนแก่น'),
-  -- วิทยาเขตสกลนคร
-  ('คณะอุตสาหกรรมและเทคโนโลยี',            'สกลนคร'),
-  ('คณะทรัพยากรธรรมชาติ',                   'สกลนคร'),
-  ('คณะพยาบาลศาสตร์',                       'สกลนคร'),
-  -- วิทยาเขตสุรินทร์
-  ('คณะเกษตรศาสตร์และเทคโนโลยี',           'สุรินทร์'),
-  ('คณะเทคโนโลยีการจัดการ',                 'สุรินทร์')
+  ('สถาบันสหสรรพศาสตร์',                    'นครราชสีมา')
 -- Re-runnable: an existing row is corrected rather than skipped, so fixing a
 -- campus here and replaying the file is enough to fix the database.
 on conflict (name_th) do update
   set campus_th = excluded.campus_th,
       is_active = true;
+
+-- The other วิทยาเขต (ขอนแก่น, สกลนคร, สุรินทร์, ร้อยเอ็ด) are out of scope for
+-- this deployment. Earlier versions of this file seeded some of them, so they
+-- are retired the same way the generic placeholders above are — is_active =
+-- false rather than DELETE, because profiles.faculty_id may already point at
+-- them. Anyone still carrying one drops off the boards until they pick again.
+-- Written as "anything that is not นครราชสีมา" so a campus this file never knew
+-- about is retired too, and kept after the insert so replaying the file cannot
+-- resurrect what it just retired.
+update public.faculties
+   set is_active = false
+ where campus_th is distinct from 'นครราชสีมา';
 
 -- ---------------------------------------------------------------------------
 -- 13. New columns on profiles
@@ -1156,10 +1156,11 @@ grant execute on function public.get_faculty_leaderboard() to authenticated;
 --     -- adjust a reference weight
 --     update public.waste_types set gram_per_item = 25 where code = 'plastic_bottle';
 --
---     -- add a faculty (วิทยาเขตร้อยเอ็ด ณ ทุ่งกุลาร้องไห้ has no teaching
---     -- units of its own yet, so it is not seeded above)
+--     -- add a faculty (only ศูนย์กลางนครราชสีมา is seeded above; a unit from
+--     -- another วิทยาเขต also needs its campus adding to CAMPUS_ORDER in
+--     -- components/FacultySelect.tsx and removing from the retire statement)
 --     insert into public.faculties (name_th, campus_th)
---     values ('คณะนวัตกรรมและเทคโนโลยีการเกษตร', 'ร้อยเอ็ด ณ ทุ่งกุลาร้องไห้');
+--     values ('คณะใหม่', 'นครราชสีมา');
 --
 --     -- retire one without breaking the profiles that point at it
 --     update public.faculties set is_active = false where name_th = '...';
