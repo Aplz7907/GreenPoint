@@ -307,10 +307,11 @@ as $$
     select 1
     from public.submissions s
     where s.image_phash is not null
-      and length(s.image_phash) = 64
-      and length(p_phash) = 64
       and s.created_at > now() - make_interval(days => p_within_days)
-      and bit_count(s.image_phash::bit(64) # p_phash::bit(64)) <= p_max_distance
+      -- CASE guards the cast itself: SQL may reorder ordinary WHERE clauses.
+      and case when s.image_phash ~ '^[01]{64}$' and p_phash ~ '^[01]{64}$'
+        then bit_count(s.image_phash::bit(64) # p_phash::bit(64)) <= p_max_distance
+        else false end
   );
 $$;
 
@@ -340,30 +341,44 @@ create policy "rewards: read active"
   to authenticated
   using (is_active);
 
--- Reward economics — this is the anti-fraud lever, not a pricing detail.
---
--- The worst a cheater can do is re-photograph one bottle 5×/day = 50 points/day
--- (the SHA-256 and dHash checks cannot stop a genuinely new photo of the same
--- object; only the daily cap bounds it). So the rewards are priced so that
--- farming is simply not worth the effort:
---
---   500 pts  →  10 days of pure farming for a 10฿ drink   ≈ 1฿/day
---   1,500 pts→  30 days                for a tote bag
---   3,000 pts→  60 days                for 20฿ of credit  ≈ 0.3฿/day
---
--- Nobody grinds two months of fake photos for twenty baht. An honest user who
--- actually sorts a few pieces of waste per photo clears these in days, not
--- months. Adjust freely — it is data, no deploy required.
-insert into public.rewards (id, name, description, points_cost, stock, is_active) values
-  (1, 'ส่วนลดเครื่องดื่ม 10 บาท', 'ใช้เป็นส่วนลดเครื่องดื่มที่ร้านกาแฟในโครงการ', 500,  100, true),
-  (2, 'ถุงผ้ารักษ์โลก',           'ถุงผ้าแคนวาส Green Point ลายพิเศษ',            1500, 20,  true),
-  (3, 'บัตรเติมเงิน 20 บาท',      'โค้ดเติมเงินมือถือ มูลค่า 20 บาท',              3000, 10,  true)
-on conflict (id) do update
+-- Catalogue from Untitled design(1).pdf, page 3. Stable seed codes avoid
+-- overwriting shop-added IDs and keep replay from creating duplicate offers.
+-- The app still reads the original columns, so old deployments remain usable.
+alter table public.rewards add column if not exists seed_code text;
+create unique index if not exists rewards_seed_code_idx on public.rewards (seed_code);
+
+-- These offers changed value/price or were removed from the PDF. Keep their
+-- identities and stock for existing coupons; never relabel a redeemed offer.
+update public.rewards set is_active = false
+where seed_code is null and (
+  (id = 1 and name = 'ส่วนลดเครื่องดื่ม 10 บาท') or
+  (id = 2 and name = 'ถุงผ้ารักษ์โลก') or
+  (id = 3 and name = 'บัตรเติมเงิน 20 บาท')
+);
+
+-- Old seeds used explicit IDs. Advance the sequence before allocating new
+-- ones, including databases with additional manually-created rewards.
+select setval(
+  pg_get_serial_sequence('public.rewards', 'id'),
+  greatest((select coalesce(max(id), 1) from public.rewards), 1),
+  exists (select 1 from public.rewards)
+);
+
+-- The PDF specifies no inventory. New offers start at zero until stocked by
+-- the operator; replay preserves both remaining inventory and manual pauses.
+-- These are the PDF prices, not the previous anti-fraud pricing assumptions.
+insert into public.rewards (seed_code, name, description, points_cost, stock, is_active) values
+  ('pdf_drink_20', 'ส่วนลดเครื่องดื่ม 20 บาท', 'ใช้ได้ที่ร้านกาแฟในมหาวิทยาลัย',             500,  0, true),
+  ('pdf_coop_50',  'คูปองร้านค้าสหกรณ์ 50 บาท', 'ใช้ซื้อสินค้าในร้านสหกรณ์',                 1200, 0, true),
+  ('pdf_seedling', 'ต้นไม้สำหรับปลูก',          'ต้นกล้าพร้อมปลูก ร่วมเพิ่มพื้นที่สีเขียว',     800,  0, true),
+  ('pdf_tote',     'กระเป๋าผ้ารักษ์โลก',         'กระเป๋าผ้าลดการใช้ถุงพลาสติก',              2000, 0, true)
+on conflict (seed_code) do update
   set name        = excluded.name,
       description = excluded.description,
-      points_cost = excluded.points_cost,
-      stock       = excluded.stock,
-      is_active   = excluded.is_active;
+      points_cost = excluded.points_cost;
+
+-- Stock is a running inventory, not seed configuration. Replaying this file
+-- must not put already-redeemed rewards back on the shelf.
 
 select setval(
   pg_get_serial_sequence('public.rewards', 'id'),
@@ -396,6 +411,17 @@ create policy "redemptions: read own"
   using (user_id = auth.uid());
 
 -- No INSERT policy: rows are created exclusively by redeem_reward().
+
+-- Retiring an offer must not hide the name on a coupon already owned by the
+-- caller. This exposes only reward metadata, never somebody else's redemption.
+drop policy if exists "rewards: read redeemed" on public.rewards;
+create policy "rewards: read redeemed"
+  on public.rewards for select
+  to authenticated
+  using (exists (
+    select 1 from public.redemptions r
+    where r.reward_id = rewards.id and r.user_id = auth.uid()
+  ));
 
 -- ---------------------------------------------------------------------------
 -- 7. redeem_reward(reward_id) — atomic, race-condition-free
@@ -1234,8 +1260,8 @@ select setval(
 alter table public.rewards
   add column if not exists partner_id int references public.partners(id) on delete set null;
 
-update public.rewards set partner_id = 1 where id = 1 and partner_id is null;
-update public.rewards set partner_id = 3 where id = 3 and partner_id is null;
+update public.rewards set partner_id = 1 where seed_code = 'pdf_drink_20' and partner_id is null;
+update public.rewards set partner_id = 3 where seed_code = 'pdf_coop_50' and partner_id is null;
 
 -- ---------------------------------------------------------------------------
 -- 20.2 drop_off_points — where a person physically hands the waste over.
@@ -1472,8 +1498,10 @@ begin
 end;
 $$;
 
-revoke all on function public.mission_progress(uuid, int) from public;
-grant execute on function public.mission_progress(uuid, int) to authenticated;
+-- Only the owner of get_my_missions()/claim_mission() needs this helper.
+-- Direct access with an arbitrary UUID would reveal another user's activity.
+revoke all on function public.mission_progress(uuid, int) from public, authenticated, anon;
+grant execute on function public.mission_progress(uuid, int) to service_role;
 
 -- ---------------------------------------------------------------------------
 -- 20.6 get_my_missions() — the whole mission board in one round trip.
@@ -1607,6 +1635,88 @@ $$;
 
 revoke all on function public.claim_mission(int) from public;
 grant execute on function public.claim_mission(int) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 20.8 record_submission — persist the server decision and pay it atomically.
+--
+-- Preflight checks in /api/submit save AI quota, but cannot arbitrate two
+-- requests arriving together. A short global transaction lock serialises the
+-- final duplicate check (including perceptual matches across different users).
+-- The profile lock also coordinates with mission claims and reward spending.
+-- No AI or storage work happens inside these locks.
+--
+-- Apply this additive RPC before deploying the new submit route. Older app
+-- versions can still use their existing functions during rollout; retire those
+-- instances promptly, since they do not participate in this transaction lock.
+-- ---------------------------------------------------------------------------
+
+create or replace function public.record_submission(p_user_id uuid, p_submission jsonb)
+returns json
+language plpgsql
+security definer
+set search_path = public
+set lock_timeout = '5s'
+as $$
+declare
+  v_status text := p_submission->>'status';
+  v_hash text := p_submission->>'image_hash';
+  v_phash text := p_submission->>'image_phash';
+  v_points int := (p_submission->>'points_earned')::int;
+  v_banned boolean;
+  v_balance int;
+  v_count int;
+  v_last timestamptz;
+  v_now timestamptz;
+  v_id uuid;
+begin
+  if p_user_id is null
+     or coalesce(v_status not in ('approved', 'rejected'), true)
+     or coalesce(v_hash !~ '^[0-9a-f]{64}$', true)
+     or (v_phash is not null and v_phash !~ '^[01]{64}$')
+     or coalesce(v_points < 0 or v_points > 250, true)
+     or (v_status = 'rejected' and v_points <> 0) then
+    raise exception 'INVALID_SUBMISSION';
+  end if;
+
+  perform pg_advisory_xact_lock(33001, 1);
+  select is_banned, points_balance into v_banned, v_balance
+  from public.profiles where id = p_user_id for update;
+  if not found then raise exception 'PROFILE_NOT_FOUND'; end if;
+  if v_banned then raise exception 'USER_BANNED'; end if;
+
+  if exists (select 1 from public.submissions where image_hash = v_hash) then
+    raise exception 'DUPLICATE_IMAGE';
+  end if;
+  if v_phash is not null and public.has_similar_image(v_phash, 6, 30) then
+    raise exception 'SIMILAR_IMAGE';
+  end if;
+
+  v_now := clock_timestamp();
+  select count(*) into v_count from public.submissions
+  where user_id = p_user_id
+    and created_at >= (date_trunc('day', v_now at time zone 'Asia/Bangkok') at time zone 'Asia/Bangkok');
+  if v_count >= 5 then raise exception 'DAILY_CAP'; end if;
+
+  -- The cooldown crosses midnight even though the daily allowance resets.
+  select max(created_at) into v_last from public.submissions where user_id = p_user_id;
+  if v_last > v_now - interval '30 seconds' then raise exception 'COOLDOWN'; end if;
+
+  insert into public.submissions (
+    user_id, image_url, image_hash, image_phash, ai_result, points_earned,
+    base_points, multiplier, grams_total, status, reject_reason, created_at
+  ) values (
+    p_user_id, p_submission->>'image_url', v_hash, v_phash, p_submission->'ai_result', v_points,
+    (p_submission->>'base_points')::int, (p_submission->>'multiplier')::numeric,
+    (p_submission->>'grams_total')::int, v_status, p_submission->>'reject_reason', v_now
+  ) returning id into v_id;
+
+  if v_points > 0 then v_balance := public.add_points(p_user_id, v_points); end if;
+  return json_build_object('submission_id', v_id, 'points_balance', v_balance);
+end;
+$$;
+
+revoke all on function public.record_submission(uuid, jsonb) from public, authenticated, anon;
+grant execute on function public.record_submission(uuid, jsonb) to service_role;
 
 -- ---------------------------------------------------------------------------
 -- 21. Reconcile every balance against the rows that justify it.

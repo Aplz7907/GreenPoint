@@ -36,6 +36,7 @@ const SYSTEM_INSTRUCTION = `คุณคือระบบตรวจสอบ�
 - ถ้าไม่พบขยะรีไซเคิลเลย ให้ items เป็น [] และ is_recyclable_photo = false
 - is_screen_photo = true ถ้ารูปนี้เป็นการถ่ายภาพจากหน้าจอมือถือ/คอมพิวเตอร์/รูปพิมพ์ (ตรวจหา moiré, ขอบจอ, แสงสะท้อน, pixel grid)
 - นับเฉพาะชิ้นที่มองเห็นชัดเจน อย่าเดา
+- รวมจำนวนแต่ละ type เป็นรายการเดียว ไม่เกิน 1,000 ชิ้นต่อประเภท
 - confidence คือความมั่นใจ 0.0–1.0`;
 
 export type GeminiOutcome =
@@ -97,8 +98,10 @@ export function parseVisionResponse(text: string): AiVisionResult | null {
     return null;
   }
 
-  const rawItems = Array.isArray(obj.items) ? obj.items : [];
+  if (!Array.isArray(obj.items)) return null;
+  const rawItems = obj.items;
   const items: DetectedItem[] = [];
+  const seen = new Set<string>();
 
   for (const entry of rawItems) {
     if (typeof entry !== 'object' || entry === null) continue;
@@ -112,13 +115,14 @@ export function parseVisionResponse(text: string): AiVisionResult | null {
       continue;
     }
 
-    const count = Math.floor(Number(e.count));
-    if (!Number.isFinite(count) || count <= 0) continue;
-
-    const rawConfidence = Number(e.confidence);
-    const confidence = Number.isFinite(rawConfidence)
-      ? Math.min(1, Math.max(0, rawConfidence))
-      : 0; // No confidence reported → treat as zero, so the item earns nothing.
+    // Coercing true to 1 or huge counts into an overflowing DB integer turns
+    // a malformed reply into a paid verdict. Retry instead of inventing data.
+    const count = e.count;
+    const confidence = e.confidence;
+    if (typeof count !== 'number' || !Number.isInteger(count) || count <= 0 || count > 1000
+      || typeof confidence !== 'number' || !Number.isFinite(confidence) || confidence < 0 || confidence > 1
+      || seen.has(type)) return null;
+    seen.add(type);
 
     items.push({ type: type as WasteCode, count, confidence });
   }
@@ -167,7 +171,9 @@ export async function analyzeWasteImage(
 
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const response = await model.generateContent(parts);
+      // Leave room inside the route's 60-second budget for persistence and a
+      // friendly failure response, even when the model never answers.
+      const response = await model.generateContent(parts, { timeout: 20000 });
       text = response.response.text();
       break;
     } catch (err) {

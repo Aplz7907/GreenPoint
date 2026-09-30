@@ -297,10 +297,10 @@ export async function POST(request: Request) {
   }
 
   // ---------------------------------------------------------------------
-  // 10. Insert the submission, then award points (service role only).
+  // 10. The database commits the submission and its payout together. It also
+  // rechecks the guards under a lock: preflight alone cannot stop racing tabs.
   // ---------------------------------------------------------------------
-  const { error: insertError } = await admin.from('submissions').insert({
-    user_id: user.id,
+  const submission = {
     image_url: storagePath,
     image_hash: imageHash,
     image_phash: imagePhash,
@@ -323,29 +323,28 @@ export async function POST(request: Request) {
     grams_total: status === 'approved' ? gramsTotal : 0,
     status,
     reject_reason: rejectReason,
+  };
+
+  const { data: saved, error: insertError } = await admin.rpc('record_submission', {
+    p_user_id: user.id,
+    p_submission: submission,
   });
 
   if (insertError) {
-    return fail('บันทึกข้อมูลไม่สำเร็จ ลองใหม่อีกครั้งนะ', 500);
-  }
-
-  let newBalance: number | undefined;
-
-  if (pointsEarned > 0) {
-    const { data: balance, error: pointsError } = await admin.rpc('add_points', {
-      p_user_id: user.id,
-      p_delta: pointsEarned,
-    });
-
-    if (pointsError) {
-      return fail('ให้แต้มไม่สำเร็จ กรุณาติดต่อผู้ดูแลระบบ', 500, {
-        status,
-        points_earned: 0,
-      });
+    const code = insertError.message;
+    if (code.includes('DUPLICATE_IMAGE') || code.includes('SIMILAR_IMAGE')) {
+      return fail('รูปนี้หรือรูปที่คล้ายกันถูกส่งแล้ว ตรวจแต้มในหน้าประวัติได้เลยนะ', 409);
     }
-
-    newBalance = balance as number;
+    if (code.includes('DAILY_CAP')) return fail('วันนี้ส่งครบ 5 ครั้งแล้ว พรุ่งนี้มาใหม่นะ', 429);
+    if (code.includes('COOLDOWN')) return fail('ส่งถี่ไปนิด รอ 30 วินาทีแล้วลองใหม่นะ', 429);
+    if (code.includes('USER_BANNED')) return fail('บัญชีนี้ถูกระงับการใช้งาน', 403);
+    // An old schema must fail closed, never fall back to the two-write payout.
+    if (insertError.code === 'PGRST202' || insertError.code === '42883') {
+      return fail('ระบบรับขยะกำลังอัปเดต ลองใหม่อีกครั้งภายหลังนะ', 503);
+    }
+    return fail('ยังยืนยันการบันทึกไม่ได้ ตรวจหน้าประวัติก่อนลองส่งอีกครั้งนะ', 503);
   }
+  const newBalance = saved?.points_balance as number | undefined;
 
   // ---------------------------------------------------------------------
   // 11. Answer in Thai.
