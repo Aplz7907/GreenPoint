@@ -2,6 +2,68 @@
 @tailwind components;
 @tailwind utilities;
 
+/* MapLibre controls live outside React. The scoped overrides keep the map
+   readable with the same theme tokens, without changing other app controls. */
+.dropoff-map {
+  background: rgb(var(--c-surface-sunken));
+  font: inherit;
+}
+
+.dropoff-marker {
+  width: 42px;
+  height: 42px;
+  border: 3px solid rgb(var(--c-surface));
+  border-radius: 50%;
+  background: rgb(var(--c-primary));
+  color: rgb(var(--c-primary-on));
+  box-shadow: 0 3px 12px rgb(var(--c-shadow) / 0.25);
+  font: inherit;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.dropoff-marker[aria-pressed='true'] {
+  background: rgb(var(--c-accent-ink));
+  color: rgb(var(--c-surface));
+  outline: 3px solid rgb(var(--c-accent-soft));
+}
+
+.dropoff-marker:focus-visible,
+.dropoff-map .maplibregl-ctrl button:focus-visible {
+  outline: 3px solid rgb(var(--c-primary));
+  outline-offset: 3px;
+}
+
+.dropoff-map .maplibregl-ctrl-group,
+.dropoff-map .maplibregl-ctrl-attrib {
+  background: rgb(var(--c-surface));
+  color: rgb(var(--c-ink-muted));
+}
+
+.dropoff-map .maplibregl-ctrl-attrib a {
+  color: rgb(var(--c-ink-muted));
+}
+
+.dropoff-map .maplibregl-ctrl-group button {
+  width: 40px;
+  height: 40px;
+  border-color: rgb(var(--c-line));
+}
+
+.dropoff-map .maplibregl-ctrl-group button:hover {
+  background: rgb(var(--c-primary-soft));
+}
+
+.dropoff-map .maplibregl-ctrl-icon {
+  background-color: rgb(var(--c-map-control-plate));
+  border-radius: 50%;
+}
+
+.dropoff-map .maplibregl-ctrl-attrib-button {
+  background-color: rgb(var(--c-map-control-plate));
+}
+
 /* ==========================================================================
    Tokens
    --------------------------------------------------------------------------
@@ -16,6 +78,10 @@
   --c-canvas: 241 248 233; /* #F1F8E9 */
   --c-surface: 255 255 255;
   --c-surface-sunken: 237 245 225;
+
+  /* MapLibre's bundled control glyphs stay black in both themes. A light
+     plate keeps them readable without inverting the rest of the map. */
+  --c-map-control-plate: 232 245 233;
 
   --c-line: 220 231 208;
   --c-line-strong: 195 212 180;

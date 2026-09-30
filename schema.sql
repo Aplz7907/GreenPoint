@@ -1240,9 +1240,10 @@ update public.rewards set partner_id = 3 where id = 3 and partner_id is null;
 -- ---------------------------------------------------------------------------
 -- 20.2 drop_off_points — where a person physically hands the waste over.
 --
---      lat/lng are stored so the UI can hand off to a real map app rather than
---      ship a map SDK: a link to Google Maps is one anchor tag and works on
---      every phone, which is the right amount of machinery for four bins.
+--      lat/lng locate markers in the 3D explorer and let a phone hand off to
+--      Google Maps for walking directions. Null coordinates keep a point in
+--      the list without inventing a marker. Verify the original seed locations
+--      against the physical collection points before field use.
 -- ---------------------------------------------------------------------------
 
 create table if not exists public.drop_off_points (
