@@ -69,6 +69,48 @@ export default function DropOffMap({ points, selectedId, onSelect }: Props) {
   const [locationMessage, setLocationMessage] = useState('');
   const [attempt, setAttempt] = useState(0);
   const [is3D, setIs3D] = useState(true);
+  const [isTouring, setIsTouring] = useState(false);
+  const [reducedMotion, setReducedMotion] = useState(true);
+
+  useEffect(() => {
+    const preference = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const update = () => {
+      setReducedMotion(preference.matches);
+      if (preference.matches) setIsTouring(false);
+    };
+    update();
+    preference.addEventListener('change', update);
+    return () => preference.removeEventListener('change', update);
+  }, []);
+
+  // A tour is explicitly started and ends after one sweep. Yield immediately
+  // to touch/keyboard input, and stop rendering when the map leaves the screen.
+  useEffect(() => {
+    const map = mapRef.current;
+    const element = container.current;
+    if (!isTouring || !ready || !map || !element) return;
+    let ended = false;
+    const stop = () => setIsTouring(false);
+    const finish = () => { ended = true; stop(); };
+    const onVisibility = () => { if (document.hidden) stop(); };
+    const observer = new IntersectionObserver(([entry]) => {
+      if (!entry.isIntersecting) stop();
+    });
+    observer.observe(element);
+    for (const event of ['pointerdown', 'wheel', 'keydown']) element.addEventListener(event, stop, { passive: true });
+    document.addEventListener('visibilitychange', onVisibility);
+    // Finish any initial fit before listening for the tour's own moveend.
+    map.stop();
+    map.once('moveend', finish);
+    map.easeTo({ bearing: map.getBearing() + 120, pitch: 60, duration: 8000, easing: t => t });
+    return () => {
+      map.off('moveend', finish);
+      if (!ended) map.stop();
+      observer.disconnect();
+      for (const event of ['pointerdown', 'wheel', 'keydown']) element.removeEventListener(event, stop);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [isTouring, ready]);
 
   useEffect(() => {
     let disposed = false;
@@ -80,6 +122,7 @@ export default function DropOffMap({ points, selectedId, onSelect }: Props) {
     setError('');
     setLocationMessage('');
     setIs3D(true);
+    setIsTouring(false);
 
     async function start() {
       try {
@@ -184,6 +227,7 @@ export default function DropOffMap({ points, selectedId, onSelect }: Props) {
   }, [points, ready]);
 
   useEffect(() => {
+    setIsTouring(false);
     markers.current.forEach(marker => {
       const element = marker.getElement();
       element.setAttribute('aria-pressed', String(element.dataset.pointId === String(selectedId)));
@@ -200,13 +244,24 @@ export default function DropOffMap({ points, selectedId, onSelect }: Props) {
           <p className="font-semibold text-ink">แผนที่จุดรับขยะ</p>
           <p className="text-xs text-ink-subtle">หมุนและซูม เพื่อดูพื้นที่รอบจุดรับ</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <button type="button" className="btn-secondary btn-sm" disabled={!ready || reducedMotion}
+            aria-pressed={isTouring} title={reducedMotion ? 'ปิดตามการตั้งค่าลดการเคลื่อนไหวของเครื่อง' : undefined}
+            onClick={() => {
+              if (!isTouring) {
+                mapRef.current?.setLayoutProperty('ecopoint-buildings', 'visibility', 'visible');
+                setIs3D(true);
+              }
+              setIsTouring(value => !value);
+            }}>{isTouring ? 'หยุดหมุน' : 'หมุนชม 3D'}</button>
           <button type="button" className="btn-outline btn-sm" disabled={!ready} onClick={() => {
+            setIsTouring(false);
             if (mapRef.current) fitPoints(mapRef.current, points);
           }}>ดูทุกจุด</button>
           <button type="button" className="btn-secondary btn-sm nums" disabled={!ready}
             aria-pressed={is3D} aria-label={is3D ? 'เปลี่ยนเป็นแผนที่ 2D' : 'เปลี่ยนเป็นแผนที่ 3D'}
             onClick={() => {
+              setIsTouring(false);
               const next = !is3D;
               mapRef.current?.easeTo({ pitch: next ? 55 : 0 });
               mapRef.current?.setLayoutProperty('ecopoint-buildings', 'visibility', next ? 'visible' : 'none');
@@ -216,6 +271,10 @@ export default function DropOffMap({ points, selectedId, onSelect }: Props) {
       </div>
       <div className="relative">
         <div ref={container} className="dropoff-map h-[360px] w-full sm:h-[440px]" />
+        {ready && !error && <div className="pointer-events-none absolute left-3 top-3 flex items-center gap-2 rounded-control border border-line bg-surface/95 px-3 py-2 text-xs font-medium text-ink-muted shadow-soft">
+          <span className="h-2 w-2 rounded-full bg-primary" />
+          <span className="nums">{points.length.toLocaleString('th-TH')} จุดบนแผนที่</span>
+        </div>}
         {!ready && !error && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-surface-sunken" role="status">
             <span className="spinner" /><p className="text-sm text-ink-muted">กำลังโหลดแผนที่ 3D…</p>

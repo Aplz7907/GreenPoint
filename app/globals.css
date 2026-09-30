@@ -2,6 +2,142 @@
 @tailwind components;
 @tailwind utilities;
 
+/* The welcome diorama uses three painted faces per bin instead of a second
+   WebGL canvas. Its entrance finishes in four seconds; reduced motion keeps
+   the same static composition. Map marker transforms belong to MapLibre. */
+.dropoff-welcome {
+  overflow: hidden;
+  background: radial-gradient(ellipse at top right, rgb(var(--c-mint) / .4), transparent 65%),
+    linear-gradient(135deg, rgb(var(--c-surface)), rgb(var(--c-primary-soft)));
+}
+
+.dropoff-scene {
+  position: relative;
+  width: 240px;
+  height: 210px;
+  margin: 0 auto;
+  perspective: 700px;
+}
+
+.dropoff-scene-halo {
+  position: absolute;
+  inset: 8px 20px 20px;
+  border: 1px solid rgb(var(--c-primary) / .15);
+  border-radius: 50%;
+  box-shadow: 0 0 0 16px rgb(var(--c-primary) / .035), 0 0 0 32px rgb(var(--c-primary) / .025);
+}
+
+.dropoff-scene-stage {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  transform: rotateX(-12deg) rotateY(-22deg);
+  animation: dropoff-scene-arrive 4s ease-out both;
+}
+
+.dropoff-scene-ground {
+  position: absolute;
+  left: 15px;
+  top: 65px;
+  width: 210px;
+  height: 140px;
+  border-radius: 16px;
+  border: 1px solid rgb(var(--c-primary) / .2);
+  background: linear-gradient(135deg, rgb(var(--c-surface)), rgb(var(--c-mint)));
+  box-shadow: 0 8px 0 rgb(var(--c-line-strong)), 0 18px 26px rgb(var(--c-shadow) / .18);
+  transform: rotateX(75deg);
+}
+
+.dropoff-bin {
+  --bin-front: var(--c-primary);
+  --bin-side: var(--c-primary-hover);
+  --bin-top: var(--c-leaf);
+  position: absolute;
+  top: 79px;
+  left: 33px;
+  width: 44px;
+  height: 62px;
+  transform-style: preserve-3d;
+  transform: translateZ(18px);
+}
+
+.dropoff-bin-1 { left: 99px; top: 69px; transform: translateZ(-6px); }
+.dropoff-bin-2 { left: 165px; top: 59px; transform: translateZ(-30px); }
+.dropoff-bin-1 { --bin-front: var(--c-info-ink); --bin-side: var(--c-sky-ink); --bin-top: var(--c-info-soft); }
+.dropoff-bin-2 { --bin-front: var(--c-warn-ink); --bin-side: var(--c-accent-ink); --bin-top: var(--c-warn-line); }
+
+.dropoff-bin-front, .dropoff-bin-side, .dropoff-bin-top {
+  position: absolute;
+  inset: 0;
+  border: 1px solid rgb(var(--c-surface) / .25);
+}
+.dropoff-bin-front {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0 0 7px 7px;
+  background: rgb(var(--bin-front));
+  color: rgb(var(--c-surface));
+  transform: translateZ(22px);
+}
+.dropoff-bin-side { background: rgb(var(--bin-side)); transform: rotateY(90deg) translateZ(22px); }
+.dropoff-bin-top {
+  height: 44px;
+  border-radius: 5px;
+  background: rgb(var(--bin-top));
+  transform: translateY(-22px) rotateX(90deg);
+}
+.dropoff-bin-top span {
+  position: absolute;
+  inset: 12px 7px;
+  border-radius: 12px;
+  background: rgb(var(--c-ink) / .55);
+}
+.dropoff-scene-pin {
+  position: absolute;
+  left: 107px;
+  top: 3px;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border: 3px solid rgb(var(--c-surface));
+  border-radius: 50% 50% 50% 12px;
+  background: rgb(var(--c-primary));
+  color: rgb(var(--c-primary-on));
+  box-shadow: 0 6px 0 rgb(var(--c-primary-hover)), 0 12px 20px rgb(var(--c-shadow) / .18);
+  transform: translateZ(35px) rotate(-12deg);
+}
+.dropoff-scene-label {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 500;
+  color: rgb(var(--c-ink-muted));
+}
+.dropoff-point-card { transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease; }
+.dropoff-selection { animation: dropoff-card-arrive .4s ease-out both; }
+@media (hover: hover) and (pointer: fine) {
+  .dropoff-point-card:hover { transform: translateY(-3px); box-shadow: 0 10px 24px rgb(var(--c-shadow) / .1); }
+}
+@keyframes dropoff-scene-arrive {
+  0% { transform: rotateX(-12deg) rotateY(-42deg) translateY(12px); }
+  45% { transform: rotateX(-8deg) rotateY(-15deg) translateY(-5px); }
+  100% { transform: rotateX(-12deg) rotateY(-22deg); }
+}
+@keyframes dropoff-card-arrive {
+  from { opacity: 0; transform: perspective(800px) rotateX(-4deg) translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dropoff-scene-stage, .dropoff-selection { animation: none; }
+  .dropoff-point-card { transition: none; }
+  .dropoff-point-card:hover { transform: none; }
+}
+
 /* MapLibre controls live outside React. The scoped overrides keep the map
    readable with the same theme tokens, without changing other app controls. */
 .dropoff-map {
@@ -16,7 +152,7 @@
   border-radius: 50%;
   background: rgb(var(--c-primary));
   color: rgb(var(--c-primary-on));
-  box-shadow: 0 3px 12px rgb(var(--c-shadow) / 0.25);
+  box-shadow: 0 4px 0 rgb(var(--c-primary-hover)), 0 8px 16px rgb(var(--c-shadow) / 0.25);
   font: inherit;
   font-weight: 700;
   font-variant-numeric: tabular-nums;

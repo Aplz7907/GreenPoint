@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic';
 import { useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ClockIcon, MapPinIcon, ScanIcon } from '@/components/Icons';
+import { DropOffScene } from '@/components/DropOffScene';
 import { WASTE_LABELS } from '@/lib/copy';
 import { acceptsWaste, directionsHref, hasCoordinates } from '@/lib/dropoff';
 import { WASTE_CODES, type DropOffPoint, type WasteCode } from '@/lib/types';
@@ -37,15 +38,20 @@ export function DropOffExplorer({ points }: { points: DropOffPoint[] }) {
 
   return (
     <div className="space-y-5">
-      <div className="card">
-        <div className="mb-4 flex items-start justify-between gap-3">
-          <div>
-            <h2 className="section-title">แยกแล้ว ไปส่งที่ไหนดี?</h2>
-            <p className="mt-1 text-sm text-ink-subtle">ค้นหาจุดที่รับขยะของเรา แล้วเลือกดูบนแผนที่</p>
+      <section className="dropoff-welcome rounded-card border border-line p-5 sm:p-6" aria-label="ค้นหาจุดรับขยะ">
+        <div className="grid items-center gap-2 sm:grid-cols-[1fr_240px]">
+          <div className="relative z-10">
+            <span className="badge bg-surface text-primary-ink"><MapPinIcon className="mr-1 h-3.5 w-3.5" /> GREEN POINT · 3D MAP</span>
+            <h2 className="mt-3 text-2xl font-bold text-ink text-balance sm:text-3xl">แยกแล้ว<br />ไปส่งที่ไหนดี?</h2>
+            <p className="mt-2 max-w-sm text-sm text-ink-muted">หาจุดรับที่ใช่ให้ขยะของเรา สำรวจพื้นที่แบบ 3D แล้วออกไปรีไซเคิลกัน</p>
+            <div className="mt-4 flex flex-wrap gap-2 text-xs font-medium">
+              <span className="rounded-control bg-surface px-3 py-2 text-primary-ink nums">{points.length.toLocaleString('th-TH')} จุดรับในระบบ</span>
+              <span className="rounded-control bg-surface/70 px-3 py-2 text-ink-muted">เลือกจุด · ดูรายละเอียด · นำทาง</span>
+            </div>
           </div>
-          <span className="badge shrink-0 bg-primary-soft text-primary-ink nums">{points.length.toLocaleString('th-TH')} จุดรับ</span>
+          <DropOffScene />
         </div>
-        <div className="grid gap-3 sm:grid-cols-[1fr_180px]">
+        <div className="relative z-10 mt-4 grid gap-3 rounded-control border border-line bg-surface p-4 sm:grid-cols-[1fr_180px]">
           <div>
             <label className="field-label" htmlFor="dropoff-search">ค้นหาจุดรับ</label>
             <input id="dropoff-search" className="input" type="search" placeholder="ชื่อจุดรับ หรืออาคาร…"
@@ -59,7 +65,7 @@ export function DropOffExplorer({ points }: { points: DropOffPoint[] }) {
             </select>
           </div>
         </div>
-      </div>
+      </section>
       <div ref={mapSection} className="scroll-mt-24">
       {located.length > 0 ? <DropOffMap points={located} selectedId={activeId} onSelect={setSelectedId} /> : (
         <div className="card bg-surface-sunken text-center text-sm text-ink-muted">
@@ -68,7 +74,7 @@ export function DropOffExplorer({ points }: { points: DropOffPoint[] }) {
       )}
       </div>
       {selected && (
-        <section className="card border-primary" aria-label="รายละเอียดจุดรับที่เลือก" aria-live="polite">
+        <section key={selected.id} className="card dropoff-selection border-primary" aria-label="รายละเอียดจุดรับที่เลือก" aria-live="polite">
           <div className="flex items-start justify-between gap-3">
             <div><p className="text-xs font-medium text-primary-ink">จุดรับที่เลือก</p><h2 className="mt-1 font-semibold">{selected.name_th}</h2></div>
             <button type="button" className="btn-ghost btn-sm" onClick={() => setSelectedId(null)}>ปิด</button>
@@ -98,7 +104,7 @@ export function DropOffExplorer({ points }: { points: DropOffPoint[] }) {
             const href = directionsHref(point);
             const index = located.findIndex(p => p.id === point.id);
             return (
-              <li key={point.id} className={`card ${activeId === point.id ? 'border-primary' : ''}`}>
+              <li key={point.id} className={`card dropoff-point-card ${activeId === point.id ? 'border-primary bg-primary-soft/30' : ''}`}>
                 <div className="flex items-start gap-3">
                   <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-soft font-semibold text-primary-ink nums" aria-hidden>
                     {index >= 0 ? (index + 1).toLocaleString('th-TH') : <MapPinIcon className="h-5 w-5" />}
